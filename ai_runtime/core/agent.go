@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 
-	"github.com/openai/openai-go"
+	openai "github.com/openai/openai-go"
 )
 
 type ToolHandlerFn func(context.Context, openai.ChatCompletionMessageToolCall) (string, error)

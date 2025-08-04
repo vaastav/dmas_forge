@@ -3,7 +3,7 @@ package openaiagent
 import (
 	"context"
 
-	"github.com/openai/openai-go"
+	openai "github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
 )
@@ -12,7 +12,7 @@ type OpenAILLMClient struct {
 	hasSysMsg     bool
 	tool_map      map[string]openai.ChatCompletionToolParam
 	tools         []openai.ChatCompletionToolParam
-	sysMsg        openai.ChatCompletionMessageParamUnion
+	sysMsg        string
 	client        *openai.Client
 	model         string
 	toolHandlerFn core.ToolHandlerFn
@@ -26,7 +26,7 @@ func NewOpenAILLMClient(ctx context.Context, url string, apikey string, model_na
 func (c *OpenAILLMClient) AddSystemPrompt(ctx context.Context, prompt string) error {
 	c.hasSysMsg = true
 	// Create or update the system message
-	c.sysMsg = openai.SystemMessage(prompt)
+	c.sysMsg = prompt
 	return nil
 }
 
@@ -44,7 +44,7 @@ func (c *OpenAILLMClient) AddTools(ctx context.Context, tooldefs map[string]open
 func (c *OpenAILLMClient) LLMCall(ctx context.Context, query string) (string, error) {
 	params := openai.ChatCompletionNewParams{
 		Messages: []openai.ChatCompletionMessageParamUnion{
-			c.sysMsg,
+			openai.SystemMessage(c.sysMsg),
 			openai.UserMessage(query),
 		},
 		Model: c.model,
@@ -60,7 +60,7 @@ func (c *OpenAILLMClient) LLMCall(ctx context.Context, query string) (string, er
 func (c *OpenAILLMClient) LLMCallWithTools(ctx context.Context, query string) (string, error) {
 	params := openai.ChatCompletionNewParams{
 		Messages: []openai.ChatCompletionMessageParamUnion{
-			c.sysMsg,
+			openai.SystemMessage(c.sysMsg),
 			openai.UserMessage(query),
 		},
 		Tools: c.tools,

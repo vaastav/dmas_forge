@@ -29,7 +29,7 @@ var Docker = cmdbuilder.SpecOption{
 	Build:       makeDockerSpec,
 }
 
-var model_file = flag.String("outfile", "model.json", "Specific model related information")
+var model_file = flag.String("modfile", "model.json", "Specific model related information")
 
 func makeDockerSpec(spec wiring.WiringSpec) ([]string, error) {
 
