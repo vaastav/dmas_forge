@@ -4,7 +4,7 @@ Current Status and Features:
 
 Agentic AI plugins:
 + openAI Agents: [ai_plugins/openai_plugin](ai_plugins/openai_plugin)
-+ A2A support: [ai_plugins/a2a](ai_plugins/a2a)
++ A2A support: [ai_plugins/a2a](ai_plugins/a2a); Currently we are building on [trpc-a2a-go](https://github.com/trpc-group/trpc-a2a-go) but we will most likely soon shift to [a2a-go](https://github.com/a2aproject/a2a-go) SDK by the official A2A project.
 + MCP support: Coming Soon
 + vLLM support: Coming Soon
 + kagent support: Coming Soon
