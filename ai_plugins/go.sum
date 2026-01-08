@@ -1,7 +1,7 @@
 github.com/blueprint-uservices/blueprint/blueprint v0.0.0-20250729202253-a8f505263256 h1:sN4xes07Q7xOtgU64WmFeyl08Yg5p6yWedy6h9yx0wQ=
 github.com/blueprint-uservices/blueprint/blueprint v0.0.0-20250729202253-a8f505263256/go.mod h1:UtwYAD0WuuSf/U18tqZ1eGVp3UzzxLTUhAkXdmRggQ4=
-github.com/blueprint-uservices/blueprint/plugins v0.0.0-20250729202253-a8f505263256 h1:yK8NHTMmorVJAVwRMq7asldOEx5k19bSYqg2hYpAkFI=
-github.com/blueprint-uservices/blueprint/plugins v0.0.0-20250729202253-a8f505263256/go.mod h1:lrHuvmxLSVgMzYqrOkyIWpv4X/FKg8PsFM6ODK87lUo=
+github.com/blueprint-uservices/blueprint/plugins v0.0.0-20260107093301-ab9a0337e606 h1:Dxf9h4sNOUNFhgqhBKCuutHGV2ykLysiFoz2pCxl8lk=
+github.com/blueprint-uservices/blueprint/plugins v0.0.0-20260107093301-ab9a0337e606/go.mod h1:lrHuvmxLSVgMzYqrOkyIWpv4X/FKg8PsFM6ODK87lUo=
 github.com/openai/openai-go v1.11.1 h1:fTQ4Sr9eoRiWFAoHzXiZZpVi6KtLeoTMyGrcOCudjNU=
 github.com/openai/openai-go v1.11.1/go.mod h1:g461MYGXEXBVdV5SaR/5tNzNbSfwTBBefwc+LlDCK0Y=
 github.com/otiai10/copy v1.14.0 h1:dCI/t1iTdYGtkvCuBG2BgR6KZa83PTclw4U5n2wAllU=

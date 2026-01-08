@@ -2,12 +2,12 @@ module github.com/vaastav/agentic_blueprint/ai_plugins
 
 go 1.22.1
 
-require (
-	github.com/blueprint-uservices/blueprint/blueprint v0.0.0-20250729202253-a8f505263256
-	github.com/blueprint-uservices/blueprint/plugins v0.0.0-20250729202253-a8f505263256
-)
+require github.com/blueprint-uservices/blueprint/blueprint v0.0.0-20250729202253-a8f505263256
 
-require github.com/vaastav/agentic_blueprint/ai_runtime v0.0.0
+require (
+	github.com/blueprint-uservices/blueprint/plugins v0.0.0-20260107093301-ab9a0337e606
+	github.com/vaastav/agentic_blueprint/ai_runtime v0.0.0
+)
 
 replace github.com/vaastav/agentic_blueprint/ai_runtime => ../ai_runtime
 

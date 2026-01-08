@@ -1,7 +1,7 @@
-github.com/blueprint-uservices/blueprint/blueprint v0.0.0-20250729202253-a8f505263256 h1:sN4xes07Q7xOtgU64WmFeyl08Yg5p6yWedy6h9yx0wQ=
-github.com/blueprint-uservices/blueprint/blueprint v0.0.0-20250729202253-a8f505263256/go.mod h1:UtwYAD0WuuSf/U18tqZ1eGVp3UzzxLTUhAkXdmRggQ4=
-github.com/blueprint-uservices/blueprint/plugins v0.0.0-20250729202253-a8f505263256 h1:yK8NHTMmorVJAVwRMq7asldOEx5k19bSYqg2hYpAkFI=
-github.com/blueprint-uservices/blueprint/plugins v0.0.0-20250729202253-a8f505263256/go.mod h1:lrHuvmxLSVgMzYqrOkyIWpv4X/FKg8PsFM6ODK87lUo=
+github.com/blueprint-uservices/blueprint/blueprint v0.0.0-20260107093301-ab9a0337e606 h1:AcfRJhJWyjG6YUoeCx1z5hIEhOZ4mGYk8GeaKVQ59rI=
+github.com/blueprint-uservices/blueprint/blueprint v0.0.0-20260107093301-ab9a0337e606/go.mod h1:UtwYAD0WuuSf/U18tqZ1eGVp3UzzxLTUhAkXdmRggQ4=
+github.com/blueprint-uservices/blueprint/plugins v0.0.0-20260107093301-ab9a0337e606 h1:Dxf9h4sNOUNFhgqhBKCuutHGV2ykLysiFoz2pCxl8lk=
+github.com/blueprint-uservices/blueprint/plugins v0.0.0-20260107093301-ab9a0337e606/go.mod h1:lrHuvmxLSVgMzYqrOkyIWpv4X/FKg8PsFM6ODK87lUo=
 github.com/blueprint-uservices/blueprint/runtime v0.0.0-20240405152959-f078915d2306 h1:Vc4p95NoNOAacUKKKJrv3BvGhdXd4kSI4JhS1UjLVaI=
 github.com/blueprint-uservices/blueprint/runtime v0.0.0-20240405152959-f078915d2306/go.mod h1:KZO9VA/GtihdKATc419+NZbdNP/rOhInglginrou2v0=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
