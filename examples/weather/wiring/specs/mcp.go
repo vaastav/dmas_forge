@@ -1,0 +1,66 @@
+package specs
+
+import (
+	"encoding/json"
+	"io/ioutil"
+	"os"
+
+	"github.com/blueprint-uservices/blueprint/blueprint/pkg/wiring"
+	"github.com/blueprint-uservices/blueprint/plugins/cmdbuilder"
+	"github.com/blueprint-uservices/blueprint/plugins/goproc"
+	"github.com/blueprint-uservices/blueprint/plugins/http"
+	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
+	"github.com/blueprint-uservices/blueprint/plugins/workflow"
+	"github.com/vaastav/agentic_blueprint/ai_plugins/mcp"
+	"github.com/vaastav/agentic_blueprint/ai_plugins/openai_plugin"
+	wf "github.com/vaastav/agentic_blueprint/examples/weather/workflow"
+)
+
+var MCP = cmdbuilder.SpecOption{
+	Name:        "mcp",
+	Description: "Deploys each agent in a separate container with mcp connecting the agents, uses OpenAI for providing the agents. The frontend weather agent is deployed with http.",
+	Build:       makeMCPSpec,
+}
+
+func makeMCPSpec(spec wiring.WiringSpec) ([]string, error) {
+
+	applyDockerDefaults := func(spec wiring.WiringSpec, serviceName string, isweather bool) string {
+		if !isweather {
+			mcp.Deploy(spec, serviceName)
+		} else {
+			http.Deploy(spec, serviceName)
+		}
+		goproc.Deploy(spec, serviceName)
+		return linuxcontainer.Deploy(spec, serviceName)
+	}
+
+	var minfo ModelInfo
+	file, err := os.Open(*model_file)
+	if err != nil {
+		return []string{}, err
+	}
+	defer file.Close()
+
+	all_bytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		return []string{}, err
+	}
+	err = json.Unmarshal(all_bytes, &minfo)
+	if err != nil {
+		return []string{}, err
+	}
+
+	model_url := minfo.URL
+	model_key := minfo.Key
+	model_name := minfo.Name
+
+	dagent := openai_plugin.OpenAILLMAgent(spec, "dagent", model_url, model_key, model_name)
+	disaster_agent := workflow.Service[wf.DisasterAgent](spec, "dagent_service", dagent)
+	disaster_ctr := applyDockerDefaults(spec, disaster_agent, false)
+
+	wagent := openai_plugin.OpenAILLMAgent(spec, "wagent", model_url, model_key, model_name)
+	weather_agent := workflow.Service[wf.WeatherAgent](spec, "wagent_service", wagent, disaster_agent)
+	weather_ctr := applyDockerDefaults(spec, weather_agent, true)
+
+	return []string{disaster_ctr, weather_ctr}, nil
+}
