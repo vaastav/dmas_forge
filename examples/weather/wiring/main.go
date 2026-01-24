@@ -12,5 +12,6 @@ func main() {
 		name,
 		specs.Docker,
 		specs.A2A,
+		specs.MCP,
 	)
 }
