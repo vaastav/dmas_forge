@@ -1,0 +1,61 @@
+package memory
+
+import (
+	"context"
+	"fmt"
+	"sort"
+	"sync"
+)
+
+// InMemoryStore implements core.Memory using a thread-safe in-memory map.
+// The namespace parameter enables isolation: agents with different namespaces
+// have independent memory spaces, while agents sharing a namespace and store
+// instance share memory.
+type InMemoryStore struct {
+	namespace string
+	data      map[string]string
+	mu        sync.RWMutex
+}
+
+// NewInMemoryStore creates a new in-memory store with the given namespace.
+func NewInMemoryStore(ctx context.Context, namespace string) (*InMemoryStore, error) {
+	return &InMemoryStore{
+		namespace: namespace,
+		data:      make(map[string]string),
+	}, nil
+}
+
+func (s *InMemoryStore) Store(ctx context.Context, key string, value string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data[key] = value
+	return nil
+}
+
+func (s *InMemoryStore) Recall(ctx context.Context, key string) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	value, ok := s.data[key]
+	if !ok {
+		return fmt.Sprintf("no memory found for key '%s'", key), nil
+	}
+	return value, nil
+}
+
+func (s *InMemoryStore) Delete(ctx context.Context, key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.data, key)
+	return nil
+}
+
+func (s *InMemoryStore) List(ctx context.Context) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	keys := make([]string, 0, len(s.data))
+	for k := range s.data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys, nil
+}
