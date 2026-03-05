@@ -36,8 +36,10 @@ func (c *OpenAILLMClient) RegisterToolCallHandler(ctx context.Context, toolHandl
 }
 
 func (c *OpenAILLMClient) AddTools(ctx context.Context, tooldefs map[string]openai.ChatCompletionToolParam) error {
-	c.tool_map = tooldefs
-	c.tools = mapsToValues(tooldefs)
+	for k, v := range tooldefs {
+		c.tool_map[k] = v
+	}
+	c.tools = mapsToValues(c.tool_map)
 	return nil
 }
 
@@ -57,6 +59,11 @@ func (c *OpenAILLMClient) LLMCall(ctx context.Context, query string) (string, er
 	return completion.Choices[0].Message.Content, nil
 }
 
+// maxToolRounds is the maximum number of tool-call round-trips allowed in a
+// single LLMCallWithTools invocation. This prevents infinite loops if the model
+// keeps requesting tool calls indefinitely.
+const maxToolRounds = 10
+
 func (c *OpenAILLMClient) LLMCallWithTools(ctx context.Context, query string) (string, error) {
 	params := openai.ChatCompletionNewParams{
 		Messages: []openai.ChatCompletionMessageParamUnion{
@@ -66,33 +73,37 @@ func (c *OpenAILLMClient) LLMCallWithTools(ctx context.Context, query string) (s
 		Tools: c.tools,
 		Model: c.model,
 	}
+
+	for range maxToolRounds {
+		completion, err := c.client.Chat.Completions.New(ctx, params)
+		if err != nil {
+			return "", err
+		}
+
+		toolCalls := completion.Choices[0].Message.ToolCalls
+		if len(toolCalls) == 0 {
+			return completion.Choices[0].Message.Content, nil
+		}
+
+		// Handle tool calls and continue the conversation
+		params.Messages = append(params.Messages, completion.Choices[0].Message.ToParam())
+		for _, toolCall := range toolCalls {
+			res, err := c.toolHandlerFn(ctx, toolCall)
+			if err != nil {
+				// Abort if the tool handler function was unable to handle the tool call
+				return "", err
+			}
+			params.Messages = append(params.Messages, openai.ToolMessage(res, toolCall.ID))
+		}
+	}
+
+	// Exhausted all rounds; make one final call without tools so the model
+	// is forced to produce a text response.
+	params.Tools = nil
 	completion, err := c.client.Chat.Completions.New(ctx, params)
 	if err != nil {
 		return "", err
 	}
-
-	toolCalls := completion.Choices[0].Message.ToolCalls
-	if len(toolCalls) == 0 {
-		return completion.Choices[0].Message.Content, nil
-	}
-
-	// Handle tool calls by continuing the conversation
-	params.Messages = append(params.Messages, completion.Choices[0].Message.ToParam())
-	for _, toolCall := range toolCalls {
-		res, err := c.toolHandlerFn(ctx, toolCall)
-		if err != nil {
-			// Abort if the tool handler function was unable to handle the tool call
-			return "", err
-		}
-		params.Messages = append(params.Messages, openai.ToolMessage(res, toolCall.ID))
-	}
-
-	// Continue conversation post tool-call
-	completion, err = c.client.Chat.Completions.New(ctx, params)
-	if err != nil {
-		return "", err
-	}
-
 	return completion.Choices[0].Message.Content, nil
 }
 
