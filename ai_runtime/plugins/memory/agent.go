@@ -113,10 +113,10 @@ type MemoryAgent struct {
 
 // NewMemoryAgent wraps the given agent with memory capabilities.
 // It registers memory tool definitions and a default handler on the inner agent.
-func NewMemoryAgent(ctx context.Context, agent core.Agent, memory core.Memory) (*MemoryAgent, error) {
+func NewMemoryAgent(ctx context.Context, agent core.Agent, memStore core.Memory) (*MemoryAgent, error) {
 	m := &MemoryAgent{
 		inner:  agent,
-		memory: memory,
+		memory: memStore,
 	}
 
 	// Register memory tools on the inner agent
