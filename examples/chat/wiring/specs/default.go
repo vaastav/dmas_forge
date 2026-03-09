@@ -3,7 +3,7 @@ package specs
 import (
 	"encoding/json"
 	"flag"
-	"io/ioutil"
+	"io"
 	"os"
 
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/wiring"
@@ -47,7 +47,7 @@ func makeDockerSpec(spec wiring.WiringSpec) ([]string, error) {
 	}
 	defer file.Close()
 
-	all_bytes, err := ioutil.ReadAll(file)
+	all_bytes, err := io.ReadAll(file)
 	if err != nil {
 		return []string{}, err
 	}
