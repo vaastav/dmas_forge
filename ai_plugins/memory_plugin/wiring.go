@@ -1,3 +1,4 @@
+// Package memory_plugin provides a client-wrapper implementation of the [core.Memory] interface, along with a MemoryAgent that can wrap any agent to give it LLM-driven memory capabilities.
 package memory_plugin
 
 import (

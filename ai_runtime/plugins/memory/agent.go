@@ -1,3 +1,39 @@
+// Package memory provides LLM-driven memory capabilities for agents.
+//
+// # Wiring Spec Usage
+//
+//	memory_plugin.MemoryAgent(spec, "my_agent", "existing_agent", "my_memory")
+//
+// This creates a new MemoryAgent named "my_agent" that wraps "existing_agent"
+// and uses "my_memory" as its storage backend. The new agent is registered in
+// the spec and can be used in workflows just like any other agent, but
+// internally has memory capabilities. Workflows are unaware of memory and they
+// interact with "my_agent" like any other agent.
+//
+// # Description
+//
+// The memory package implements a decorator pattern that wraps any [core.Agent]
+// with persistent long-term memory capabilities. The [MemoryAgent] type adds
+// four memory tools that the LLM can use autonomously to store, recall, delete,
+// and list information.
+//
+// The implementation modifies the agent in two ways:
+//
+//  1. Memory tools: Adds four tool definitions (store_memory, recall_memory,
+//     delete_memory, list_memories) to the inner agent. These give the LLM
+//     function-calling capabilities to interact with memory.
+//
+//  2. System prompt suffix: A prompt instructing the LLM on memory usage is
+//     appended to every system prompt via [core.Agent.AddSystemPrompt],
+//     encouraging proactive use of memory to improve responses.
+//
+// # Storage
+//
+// The [core.Memory] interface defines the memory storage abstraction. The
+// interface expects a KV store with methods to store, recall, delete, and list
+// memories. You can implement this interface to support any storage backend,
+// like Redis, SQLite, or in-memory maps. The InMemoryStore is a simple
+// implementation given for convenience.
 package memory
 
 import (
