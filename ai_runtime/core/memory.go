@@ -1,6 +1,13 @@
 package core
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+// ErrKeyNotFound is returned by Memory.Recall when the requested key does not exist.
+// This is so the handler can provide the agent with feedback that the key was not found.
+var ErrKeyNotFound = errors.New("key not found")
 
 // Memory provides a key-value long-term knowledge store for agents.
 // Implementations must be safe for concurrent use.
@@ -9,8 +16,7 @@ type Memory interface {
 	Store(ctx context.Context, key string, value string) error
 
 	// Recall retrieves the value for the given key.
-	// Returns a human-readable "not found" message (not an error) if the key does not exist,
-	// so the LLM receives useful feedback.
+	// Returns ErrKeyNotFound if the key does not exist.
 	Recall(ctx context.Context, key string) (string, error)
 
 	// Delete removes the value for the given key. No-op if the key does not exist.

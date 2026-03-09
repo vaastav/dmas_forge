@@ -2,9 +2,10 @@ package memory
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"sync"
+
+	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
 )
 
 // InMemoryStore implements core.Memory using a thread-safe in-memory map.
@@ -32,7 +33,7 @@ func (s *InMemoryStore) Recall(ctx context.Context, key string) (string, error) 
 	defer s.mu.RUnlock()
 	value, ok := s.data[key]
 	if !ok {
-		return fmt.Sprintf("no memory found for key '%s'", key), nil
+		return "", core.ErrKeyNotFound
 	}
 	return value, nil
 }

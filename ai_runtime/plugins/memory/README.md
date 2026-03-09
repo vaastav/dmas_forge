@@ -48,7 +48,7 @@ The \[core.Memory\] interface defines the memory storage abstraction. The interf
 
 
 <a name="InMemoryStore"></a>
-## type [InMemoryStore](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/store.go#L11-L14>)
+## type [InMemoryStore](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/store.go#L12-L15>)
 
 InMemoryStore implements core.Memory using a thread\-safe in\-memory map.
 
@@ -59,7 +59,7 @@ type InMemoryStore struct {
 ```
 
 <a name="NewInMemoryStore"></a>
-### func [NewInMemoryStore](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/store.go#L17>)
+### func [NewInMemoryStore](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/store.go#L18>)
 
 ```go
 func NewInMemoryStore(ctx context.Context) (*InMemoryStore, error)
@@ -68,7 +68,7 @@ func NewInMemoryStore(ctx context.Context) (*InMemoryStore, error)
 NewInMemoryStore creates a new in\-memory store.
 
 <a name="InMemoryStore.Delete"></a>
-### func \(\*InMemoryStore\) [Delete](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/store.go#L40>)
+### func \(\*InMemoryStore\) [Delete](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/store.go#L41>)
 
 ```go
 func (s *InMemoryStore) Delete(ctx context.Context, key string) error
@@ -77,7 +77,7 @@ func (s *InMemoryStore) Delete(ctx context.Context, key string) error
 
 
 <a name="InMemoryStore.List"></a>
-### func \(\*InMemoryStore\) [List](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/store.go#L47>)
+### func \(\*InMemoryStore\) [List](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/store.go#L48>)
 
 ```go
 func (s *InMemoryStore) List(ctx context.Context) ([]string, error)
@@ -86,7 +86,7 @@ func (s *InMemoryStore) List(ctx context.Context) ([]string, error)
 
 
 <a name="InMemoryStore.Recall"></a>
-### func \(\*InMemoryStore\) [Recall](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/store.go#L30>)
+### func \(\*InMemoryStore\) [Recall](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/store.go#L31>)
 
 ```go
 func (s *InMemoryStore) Recall(ctx context.Context, key string) (string, error)
@@ -95,7 +95,7 @@ func (s *InMemoryStore) Recall(ctx context.Context, key string) (string, error)
 
 
 <a name="InMemoryStore.Store"></a>
-### func \(\*InMemoryStore\) [Store](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/store.go#L23>)
+### func \(\*InMemoryStore\) [Store](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/store.go#L24>)
 
 ```go
 func (s *InMemoryStore) Store(ctx context.Context, key string, value string) error
@@ -104,7 +104,7 @@ func (s *InMemoryStore) Store(ctx context.Context, key string, value string) err
 
 
 <a name="MemoryAgent"></a>
-## type [MemoryAgent](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/agent.go#L144-L148>)
+## type [MemoryAgent](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/agent.go#L145-L149>)
 
 MemoryAgent is a decorator that wraps any core.Agent with LLM\-driven memory capabilities. It registers memory tools on the inner agent and composes tool handlers so that memory tool calls are handled internally while all other tool calls are delegated to the user's handler.
 
@@ -117,7 +117,7 @@ type MemoryAgent struct {
 ```
 
 <a name="NewMemoryAgent"></a>
-### func [NewMemoryAgent](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/agent.go#L152>)
+### func [NewMemoryAgent](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/agent.go#L153>)
 
 ```go
 func NewMemoryAgent(ctx context.Context, agent core.Agent, memStore core.Memory) (*MemoryAgent, error)
@@ -126,7 +126,7 @@ func NewMemoryAgent(ctx context.Context, agent core.Agent, memStore core.Memory)
 NewMemoryAgent wraps the given agent with memory capabilities. It registers memory tool definitions and a default handler on the inner agent.
 
 <a name="MemoryAgent.AddSystemPrompt"></a>
-### func \(\*MemoryAgent\) [AddSystemPrompt](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/agent.go#L175>)
+### func \(\*MemoryAgent\) [AddSystemPrompt](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/agent.go#L176>)
 
 ```go
 func (m *MemoryAgent) AddSystemPrompt(ctx context.Context, prompt string) error
@@ -135,7 +135,7 @@ func (m *MemoryAgent) AddSystemPrompt(ctx context.Context, prompt string) error
 AddSystemPrompt appends a memory instruction to the user's prompt and forwards it to the inner agent.
 
 <a name="MemoryAgent.AddTools"></a>
-### func \(\*MemoryAgent\) [AddTools](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/agent.go#L181>)
+### func \(\*MemoryAgent\) [AddTools](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/agent.go#L182>)
 
 ```go
 func (m *MemoryAgent) AddTools(ctx context.Context, tooldefs map[string]openai.ChatCompletionToolParam) error
@@ -144,7 +144,7 @@ func (m *MemoryAgent) AddTools(ctx context.Context, tooldefs map[string]openai.C
 AddTools forwards tool registration to the inner agent. Memory tools were already registered in the constructor.
 
 <a name="MemoryAgent.LLMCall"></a>
-### func \(\*MemoryAgent\) [LLMCall](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/agent.go#L186>)
+### func \(\*MemoryAgent\) [LLMCall](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/agent.go#L187>)
 
 ```go
 func (m *MemoryAgent) LLMCall(ctx context.Context, query string) (string, error)
@@ -153,7 +153,7 @@ func (m *MemoryAgent) LLMCall(ctx context.Context, query string) (string, error)
 LLMCall forwards to the inner agent.
 
 <a name="MemoryAgent.LLMCallWithTools"></a>
-### func \(\*MemoryAgent\) [LLMCallWithTools](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/agent.go#L191>)
+### func \(\*MemoryAgent\) [LLMCallWithTools](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/agent.go#L192>)
 
 ```go
 func (m *MemoryAgent) LLMCallWithTools(ctx context.Context, query string) (string, error)
@@ -162,7 +162,7 @@ func (m *MemoryAgent) LLMCallWithTools(ctx context.Context, query string) (strin
 LLMCallWithTools forwards to the inner agent.
 
 <a name="MemoryAgent.RegisterToolCallHandler"></a>
-### func \(\*MemoryAgent\) [RegisterToolCallHandler](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/agent.go#L198>)
+### func \(\*MemoryAgent\) [RegisterToolCallHandler](<https://github.com/Abdomash/dmas_forge/blob/main/ai_runtime/plugins/memory/agent.go#L199>)
 
 ```go
 func (m *MemoryAgent) RegisterToolCallHandler(ctx context.Context, toolHandlerFn core.ToolHandlerFn) error

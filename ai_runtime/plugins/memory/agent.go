@@ -39,6 +39,7 @@ package memory
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -224,7 +225,7 @@ func (m *MemoryAgent) handleMemoryToolCall(ctx context.Context, tc openai.ChatCo
 	case "delete_memory":
 		return m.handleDeleteMemory(ctx, tc)
 	case "list_memories":
-		return m.handleListMemories(ctx, tc)
+		return m.handleListMemories(ctx)
 	default:
 		return "", fmt.Errorf("unknown memory tool: %s", tc.Function.Name)
 	}
@@ -253,6 +254,9 @@ func (m *MemoryAgent) handleRecallMemory(ctx context.Context, tc openai.ChatComp
 	}
 	value, err := m.memory.Recall(ctx, args.Key)
 	if err != nil {
+		if errors.Is(err, core.ErrKeyNotFound) {
+			return fmt.Sprintf("No memory found for key '%s'.", args.Key), nil
+		}
 		return "", fmt.Errorf("recall_memory: %w", err)
 	}
 	return value, nil
@@ -271,7 +275,7 @@ func (m *MemoryAgent) handleDeleteMemory(ctx context.Context, tc openai.ChatComp
 	return fmt.Sprintf("Deleted memory for key '%s'.", args.Key), nil
 }
 
-func (m *MemoryAgent) handleListMemories(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
+func (m *MemoryAgent) handleListMemories(ctx context.Context) (string, error) {
 	keys, err := m.memory.List(ctx)
 	if err != nil {
 		return "", fmt.Errorf("list_memories: %w", err)
