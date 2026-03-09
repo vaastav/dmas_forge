@@ -8,20 +8,15 @@ import (
 )
 
 // InMemoryStore implements core.Memory using a thread-safe in-memory map.
-// The namespace parameter enables isolation: agents with different namespaces
-// have independent memory spaces, while agents sharing a namespace and store
-// instance share memory.
 type InMemoryStore struct {
-	namespace string
-	data      map[string]string
-	mu        sync.RWMutex
+	data map[string]string
+	mu   sync.RWMutex
 }
 
-// NewInMemoryStore creates a new in-memory store with the given namespace.
-func NewInMemoryStore(ctx context.Context, namespace string) (*InMemoryStore, error) {
+// NewInMemoryStore creates a new in-memory store.
+func NewInMemoryStore(ctx context.Context) (*InMemoryStore, error) {
 	return &InMemoryStore{
-		namespace: namespace,
-		data:      make(map[string]string),
+		data: make(map[string]string),
 	}, nil
 }
 

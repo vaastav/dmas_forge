@@ -7,14 +7,12 @@ import (
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/wiring"
 )
 
-// MemoryStore registers an in-memory key-value store with the given namespace.
-// The namespace parameter controls isolation: agents sharing the same namespace
-// and store instance share memory; different namespaces provide isolation.
-func MemoryStore(spec wiring.WiringSpec, name string, namespace string) string {
+// MemoryStore registers an in-memory key-value store.
+func MemoryStore(spec wiring.WiringSpec, name string) string {
 	backendName := name + ".memory_store"
 
 	spec.Define(backendName, &MemoryStoreClient{}, func(ns wiring.Namespace) (ir.IRNode, error) {
-		return newMemoryStoreClient(name, namespace)
+		return newMemoryStoreClient(name)
 	})
 
 	pointer.CreatePointer[*MemoryStoreClient](spec, name, backendName)

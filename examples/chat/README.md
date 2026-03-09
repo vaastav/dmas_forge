@@ -13,7 +13,7 @@ The application has one workflow service (`ChatAgent`) and two infrastructure co
 The workflow code never references memory. Whether memory is enabled is purely a wiring decision in `wiring/specs/default.go`:
 
 ```go
-memStore := memory_plugin.MemoryStore(spec, "chat_memory", "chat")
+memStore := memory_plugin.MemoryStore(spec, "chat_memory")
 baseAgent := openai_plugin.OpenAILLMAgent(spec, "agent_base", model_url, model_key, model_name)
 agent := memory_plugin.MemoryAgent(spec, "agent", baseAgent, memStore)
 chatService := workflow.Service[wf.ChatAgent](spec, "chat_service", agent)
@@ -61,5 +61,4 @@ Behind the scenes, the LLM calls `store_memory` to persist facts and `list_memor
 ## Notes
 
 - Memory is in-process and not persisted to disk. Restarting the container resets all memories.
-- The memory store is namespaced (`"chat"` in this example). Multiple agents can share a store instance with the same namespace, or be isolated with different namespaces.
 - The quality of memory usage depends on the model. More capable models (e.g. gpt-4) are more reliable at proactively using memory tools.

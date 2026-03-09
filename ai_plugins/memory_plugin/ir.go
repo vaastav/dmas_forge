@@ -19,15 +19,14 @@ type MemoryStoreClient struct {
 
 	Spec       *workflowspec.Service
 	ClientName string
-	Namespace  string
 }
 
-func newMemoryStoreClient(name string, namespace string) (*MemoryStoreClient, error) {
+func newMemoryStoreClient(name string) (*MemoryStoreClient, error) {
 	spec, err := workflowspec.GetService[memory.InMemoryStore]()
 	if err != nil {
 		return nil, err
 	}
-	return &MemoryStoreClient{Spec: spec, ClientName: name, Namespace: namespace}, nil
+	return &MemoryStoreClient{Spec: spec, ClientName: name}, nil
 }
 
 // Implements ir.IRNode
@@ -37,7 +36,7 @@ func (node *MemoryStoreClient) Name() string {
 
 // Implements ir.IRNode
 func (node *MemoryStoreClient) String() string {
-	return node.Name() + " = InMemoryStore(" + node.Namespace + ")"
+	return node.Name() + " = InMemoryStore()"
 }
 
 // Implements golang.Instantiable
@@ -49,7 +48,7 @@ func (node *MemoryStoreClient) AddInstantiation(builder golang.NamespaceBuilder)
 	slog.Info(fmt.Sprintf("Instantiating MemoryStoreClient %v in %v/%v", node.ClientName, builder.Info().Package.PackageName, builder.Info().FileName))
 
 	constructor := node.Spec.Constructor.AsConstructor()
-	return builder.DeclareConstructor(node.ClientName, constructor, []ir.IRNode{&ir.IRValue{Value: node.Namespace}})
+	return builder.DeclareConstructor(node.ClientName, constructor, []ir.IRNode{})
 }
 
 // Implements golang.ProvidesModule

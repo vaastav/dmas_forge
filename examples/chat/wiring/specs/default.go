@@ -61,7 +61,7 @@ func makeDockerSpec(spec wiring.WiringSpec) ([]string, error) {
 	model_name := minfo.Name
 
 	// Create memory store
-	memStore := memory_plugin.MemoryStore(spec, "chat_memory", "chat")
+	memStore := memory_plugin.MemoryStore(spec, "chat_memory")
 
 	// Create base LLM agent, then wrap with memory
 	baseAgent := openai_plugin.OpenAILLMAgent(spec, "agent_base", model_url, model_key, model_name)
