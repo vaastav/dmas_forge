@@ -25,52 +25,69 @@ type ModelInfo struct {
 	Key  string `json:"key"`
 }
 
-var Docker = cmdbuilder.SpecOption{
-	Name:        "docker",
+var Memory = cmdbuilder.SpecOption{
+	Name:        "memory",
 	Description: "Deploys the chat agent in a container with http, uses OpenAI with memory enabled",
-	Build:       makeDockerSpec,
+	Build:       makeMemorySpec,
+}
+
+var NoMemory = cmdbuilder.SpecOption{
+	Name:        "no_memory",
+	Description: "Deploys the chat agent in a container with http, uses OpenAI without memory",
+	Build:       makeNoMemorySpec,
 }
 
 var model_file = flag.String("modfile", "model.json", "Specific model related information")
 
-func makeDockerSpec(spec wiring.WiringSpec) ([]string, error) {
-
-	applyDockerDefaults := func(spec wiring.WiringSpec, serviceName string) string {
-		http.Deploy(spec, serviceName)
-		goproc.Deploy(spec, serviceName)
-		return linuxcontainer.Deploy(spec, serviceName)
+func makeMemorySpec(spec wiring.WiringSpec) ([]string, error) {
+	minfo, err := readModelInfo()
+	if err != nil {
+		return []string{}, err
 	}
 
+	memStore := memory_plugin.MemoryStore[*memory.InMemoryStore](spec, "chat_memory")
+	baseAgent := openai_plugin.OpenAILLMAgent(spec, "agent_base", minfo.URL, minfo.Key, minfo.Name, openai_plugin.AgentConfig{})
+	agent := memory_plugin.MemoryAgent(spec, "agent", baseAgent, memStore)
+
+	chatCtr := deployChatService(spec, agent)
+	return []string{chatCtr}, nil
+}
+
+func makeNoMemorySpec(spec wiring.WiringSpec) ([]string, error) {
+	minfo, err := readModelInfo()
+	if err != nil {
+		return []string{}, err
+	}
+
+	agent := openai_plugin.OpenAILLMAgent(spec, "agent", minfo.URL, minfo.Key, minfo.Name, openai_plugin.AgentConfig{})
+
+	chatCtr := deployChatService(spec, agent)
+	return []string{chatCtr}, nil
+}
+
+func readModelInfo() (ModelInfo, error) {
 	var minfo ModelInfo
 	file, err := os.Open(*model_file)
 	if err != nil {
-		return []string{}, err
+		return ModelInfo{}, err
 	}
 	defer file.Close()
 
 	all_bytes, err := io.ReadAll(file)
 	if err != nil {
-		return []string{}, err
+		return ModelInfo{}, err
 	}
 	err = json.Unmarshal(all_bytes, &minfo)
 	if err != nil {
-		return []string{}, err
+		return ModelInfo{}, err
 	}
 
-	model_url := minfo.URL
-	model_key := minfo.Key
-	model_name := minfo.Name
+	return minfo, nil
+}
 
-	// Create memory store
-	memStore := memory_plugin.MemoryStore[*memory.InMemoryStore](spec, "chat_memory")
-
-	// Create base LLM agent, then wrap with memory
-	baseAgent := openai_plugin.OpenAILLMAgent(spec, "agent_base", model_url, model_key, model_name, openai_plugin.AgentConfig{})
-	agent := memory_plugin.MemoryAgent(spec, "agent", baseAgent, memStore)
-
-	// Register workflow service -- workflow only sees core.Agent
+func deployChatService(spec wiring.WiringSpec, agent string) string {
 	chatService := workflow.Service[wf.ChatAgent](spec, "chat_service", agent)
-	chatCtr := applyDockerDefaults(spec, chatService)
-
-	return []string{chatCtr}, nil
+	http.Deploy(spec, chatService)
+	goproc.Deploy(spec, chatService)
+	return linuxcontainer.Deploy(spec, chatService)
 }

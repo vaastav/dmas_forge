@@ -9,6 +9,7 @@ func main() {
 	name := "chat"
 	cmdbuilder.MakeAndExecute(
 		name,
-		specs.Docker,
+		specs.Memory,
+		specs.NoMemory,
 	)
 }

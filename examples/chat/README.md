@@ -1,6 +1,6 @@
 # Chat Agent Example
 
-A single-agent conversational application with persistent memory. The agent remembers information across requests using LLM-driven memory tools -- the LLM autonomously decides what to store and recall.
+A single-agent application with persistent memory. The agent remembers information across requests using LLM-driven memory tools -- the LLM autonomously decides what to store and recall. Note that this example doesn't have sessions, so the agent doesn't see any previous messages in the conversation. It relies entirely on memory tools for remembering information across requests.
 
 ## Architecture
 
@@ -25,6 +25,8 @@ The `MemoryStore` function is generic and accepts any `core.Memory` implementati
 memStore := memory_plugin.MemoryStore[*redis.RedisMemory](spec, "chat_memory")
 ```
 
+In this example, however, we use the built-in `memory.InMemoryStore` for simplicity. 
+
 ## Setup
 
 Edit `wiring/example_model.json` with your API key, model name, and URL:
@@ -39,10 +41,21 @@ Edit `wiring/example_model.json` with your API key, model name, and URL:
 
 ## Build and Run
 
+### With Memory
+
 ```bash
 cd examples/chat/wiring
-go run main.go -w docker -o build -modfile=./example_model.json
-cd build/docker
+go run main.go -w memory -o build -modfile=./example_model.json
+cd build/memory
+docker compose build && docker compose up -d
+```
+
+### Without Memory
+
+```bash
+cd examples/chat/wiring
+go run main.go -w no_memory -o build -modfile=./example_model.json
+cd build/no_memory
 docker compose build && docker compose up -d
 ```
 
@@ -68,3 +81,4 @@ Behind the scenes, the LLM calls `store_memory` to persist facts and `list_memor
 
 - Memory is in-process and not persisted to disk. Restarting the container resets all memories.
 - The quality of memory usage depends on the model. More capable models (e.g. gpt-4) are more reliable at proactively using memory tools.
+- This example doesn't have sessions, so the model doesn't see any previous messages in the conversation.
