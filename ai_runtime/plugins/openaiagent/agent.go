@@ -2,6 +2,7 @@ package openaiagent
 
 import (
 	"context"
+	"strconv"
 
 	openai "github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -16,11 +17,20 @@ type OpenAILLMClient struct {
 	client        *openai.Client
 	model         string
 	toolHandlerFn core.ToolHandlerFn
+	maxToolRounds int
 }
 
-func NewOpenAILLMClient(ctx context.Context, url string, apikey string, model_name string) (*OpenAILLMClient, error) {
+// NewOpenAILLMClient creates a new OpenAI LLM client.
+// The maxToolRounds parameter specifies the maximum number of tool-call
+// round-trips allowed in a single LLMCallWithTools invocation.
+// If maxToolRounds is empty, unparseable, 0, or negative, the default value of 10 is used.
+func NewOpenAILLMClient(ctx context.Context, url string, apikey string, model_name string, maxToolRounds string) (*OpenAILLMClient, error) {
 	client := openai.NewClient(option.WithBaseURL(url), option.WithAPIKey(apikey))
-	return &OpenAILLMClient{client: &client, tool_map: make(map[string]openai.ChatCompletionToolParam), model: model_name}, nil
+	maxRounds, err := strconv.Atoi(maxToolRounds)
+	if err != nil || maxRounds <= 0 {
+		maxRounds = defaultMaxToolRounds
+	}
+	return &OpenAILLMClient{client: &client, tool_map: make(map[string]openai.ChatCompletionToolParam), model: model_name, maxToolRounds: maxRounds}, nil
 }
 
 func (c *OpenAILLMClient) AddSystemPrompt(ctx context.Context, prompt string) error {
@@ -59,10 +69,11 @@ func (c *OpenAILLMClient) LLMCall(ctx context.Context, query string) (string, er
 	return completion.Choices[0].Message.Content, nil
 }
 
-// maxToolRounds is the maximum number of tool-call round-trips allowed in a
-// single LLMCallWithTools invocation. This prevents infinite loops if the model
-// keeps requesting tool calls indefinitely.
-const maxToolRounds = 10
+// defaultMaxToolRounds is the default maximum number of tool-call round-trips
+// allowed in a single LLMCallWithTools invocation. This prevents infinite loops
+// if the model keeps requesting tool calls indefinitely.
+// The value can be overridden via the maxToolRounds parameter in NewOpenAILLMClient.
+const defaultMaxToolRounds = 10
 
 func (c *OpenAILLMClient) LLMCallWithTools(ctx context.Context, query string) (string, error) {
 	params := openai.ChatCompletionNewParams{
@@ -74,7 +85,7 @@ func (c *OpenAILLMClient) LLMCallWithTools(ctx context.Context, query string) (s
 		Model: c.model,
 	}
 
-	for range maxToolRounds {
+	for range c.maxToolRounds {
 		completion, err := c.client.Chat.Completions.New(ctx, params)
 		if err != nil {
 			return "", err
