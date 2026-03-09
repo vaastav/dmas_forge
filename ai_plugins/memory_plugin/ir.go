@@ -8,10 +8,11 @@ import (
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/ir"
 	"github.com/blueprint-uservices/blueprint/plugins/golang"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow/workflowspec"
+	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
 	"github.com/vaastav/agentic_blueprint/ai_runtime/plugins/memory"
 )
 
-// MemoryStoreClient is the IR node for an InMemoryStore instance.
+// MemoryStoreClient is the IR node for a memory store instance.
 type MemoryStoreClient struct {
 	golang.Service
 	ir.IRNode
@@ -21,8 +22,8 @@ type MemoryStoreClient struct {
 	ClientName string
 }
 
-func newMemoryStoreClient(name string) (*MemoryStoreClient, error) {
-	spec, err := workflowspec.GetService[memory.InMemoryStore]()
+func newMemoryStoreClient[Impl core.Memory](name string) (*MemoryStoreClient, error) {
+	spec, err := workflowspec.GetService[Impl]()
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +37,7 @@ func (node *MemoryStoreClient) Name() string {
 
 // Implements ir.IRNode
 func (node *MemoryStoreClient) String() string {
-	return node.Name() + " = InMemoryStore()"
+	return node.Name() + " = " + node.Spec.Constructor.Name + "()"
 }
 
 // Implements golang.Instantiable

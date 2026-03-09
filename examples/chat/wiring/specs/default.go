@@ -15,6 +15,7 @@ import (
 
 	"github.com/vaastav/agentic_blueprint/ai_plugins/memory_plugin"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/openai_plugin"
+	"github.com/vaastav/agentic_blueprint/ai_runtime/plugins/memory"
 	wf "github.com/vaastav/agentic_blueprint/examples/chat/workflow"
 )
 
@@ -61,7 +62,7 @@ func makeDockerSpec(spec wiring.WiringSpec) ([]string, error) {
 	model_name := minfo.Name
 
 	// Create memory store
-	memStore := memory_plugin.MemoryStore(spec, "chat_memory")
+	memStore := memory_plugin.MemoryStore[*memory.InMemoryStore](spec, "chat_memory")
 
 	// Create base LLM agent, then wrap with memory
 	baseAgent := openai_plugin.OpenAILLMAgent(spec, "agent_base", model_url, model_key, model_name)

@@ -13,10 +13,16 @@ The application has one workflow service (`ChatAgent`) and two infrastructure co
 The workflow code never references memory. Whether memory is enabled is purely a wiring decision in `wiring/specs/default.go`:
 
 ```go
-memStore := memory_plugin.MemoryStore(spec, "chat_memory")
+memStore := memory_plugin.MemoryStore[*memory.InMemoryStore](spec, "chat_memory")
 baseAgent := openai_plugin.OpenAILLMAgent(spec, "agent_base", model_url, model_key, model_name)
 agent := memory_plugin.MemoryAgent(spec, "agent", baseAgent, memStore)
 chatService := workflow.Service[wf.ChatAgent](spec, "chat_service", agent)
+```
+
+The `MemoryStore` function is generic and accepts any `core.Memory` implementation. For example, if you built a custom Redis-backed store, you would use it as:
+
+```go
+memStore := memory_plugin.MemoryStore[*redis.RedisMemory](spec, "chat_memory")
 ```
 
 ## Setup

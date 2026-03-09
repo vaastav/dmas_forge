@@ -1,18 +1,30 @@
-// Package memory_plugin provides a client-wrapper implementation of the [core.Memory] interface, along with a MemoryAgent that can wrap any agent to give it LLM-driven memory capabilities.
+// Package memory_plugin provides wiring functions for memory-backed agents.
+// Use MemoryStore[Impl] to create a memory store with any core.Memory implementation,
+// and MemoryAgent to wrap an agent with LLM-driven memory capabilities.
 package memory_plugin
 
 import (
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/coreplugins/pointer"
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/ir"
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/wiring"
+	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
 )
 
-// MemoryStore registers an in-memory key-value store.
-func MemoryStore(spec wiring.WiringSpec, name string) string {
+// MemoryStore creates a memory store using the specified implementation.
+// Impl must be a concrete type that implements [core.Memory].
+//
+// Example usage:
+//
+//	// Using the built-in in-memory store
+//	memStore := memory_plugin.MemoryStore[*memory.InMemoryStore](spec, "my_memory")
+//
+//	// Using a custom Redis-backed store
+//	memStore := memory_plugin.MemoryStore[*redis.RedisMemory](spec, "my_memory")
+func MemoryStore[Impl core.Memory](spec wiring.WiringSpec, name string) string {
 	backendName := name + ".memory_store"
 
 	spec.Define(backendName, &MemoryStoreClient{}, func(ns wiring.Namespace) (ir.IRNode, error) {
-		return newMemoryStoreClient(name)
+		return newMemoryStoreClient[Impl](name)
 	})
 
 	pointer.CreatePointer[*MemoryStoreClient](spec, name, backendName)
