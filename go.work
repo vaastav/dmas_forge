@@ -3,6 +3,8 @@ go 1.22.1
 use (
 	./ai_plugins
 	./ai_runtime
+	./examples/chat/wiring
+	./examples/chat/workflow
 	./examples/weather/wiring
 	./examples/weather/workflow
 )

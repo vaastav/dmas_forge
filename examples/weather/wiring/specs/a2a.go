@@ -49,11 +49,11 @@ func makeA2ASpec(spec wiring.WiringSpec) ([]string, error) {
 	model_key := minfo.Key
 	model_name := minfo.Name
 
-	dagent := openai_plugin.OpenAILLMAgent(spec, "dagent", model_url, model_key, model_name)
+	dagent := openai_plugin.OpenAILLMAgent(spec, "dagent", model_url, model_key, model_name, openai_plugin.AgentConfig{})
 	disaster_agent := workflow.Service[wf.DisasterAgent](spec, "dagent_service", dagent)
 	disaster_ctr := applyDockerDefaults(spec, disaster_agent)
 
-	wagent := openai_plugin.OpenAILLMAgent(spec, "wagent", model_url, model_key, model_name)
+	wagent := openai_plugin.OpenAILLMAgent(spec, "wagent", model_url, model_key, model_name, openai_plugin.AgentConfig{})
 	weather_agent := workflow.Service[wf.WeatherAgent](spec, "wagent_service", wagent, disaster_agent)
 	weather_ctr := applyDockerDefaults(spec, weather_agent)
 

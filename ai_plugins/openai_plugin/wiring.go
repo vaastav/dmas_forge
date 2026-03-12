@@ -6,12 +6,24 @@ import (
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/wiring"
 )
 
-func OpenAILLMAgent(spec wiring.WiringSpec, agent_name string, url string, apikey string, model_name string) string {
+// AgentConfig holds optional configuration for an OpenAI LLM agent.
+// Zero values indicate use of defaults.
+type AgentConfig struct {
+	// MaxToolRounds is the maximum number of tool-call round-trips allowed
+	// in a single LLMCallWithTools invocation.
+	// If set to 0 (or unset), the default value of 10 is used.
+	MaxToolRounds int
+}
+
+// OpenAILLMAgent creates an OpenAI LLM agent with the given configuration.
+// The config parameter allows customization of agent behavior; zero values
+// in config fields will use sensible defaults.
+func OpenAILLMAgent(spec wiring.WiringSpec, agent_name string, url string, apikey string, model_name string, config AgentConfig) string {
 
 	agentBackendName := agent_name + ".openai_agent"
 
 	spec.Define(agentBackendName, &AgentClient{}, func(namespace wiring.Namespace) (ir.IRNode, error) {
-		return newAgentClient(agent_name, url, apikey, model_name)
+		return newAgentClient(agent_name, url, apikey, model_name, config.MaxToolRounds)
 	})
 
 	pointer.CreatePointer[*AgentClient](spec, agent_name, agentBackendName)
