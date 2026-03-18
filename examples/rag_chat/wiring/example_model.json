@@ -1,0 +1,6 @@
+{
+    "name": "gpt-5.4-nano",
+    "url": "https://api.openai.com/v1",
+    "key": "your-api-key-here",
+    "embedding_model": "text-embedding-3-small"
+}
