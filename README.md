@@ -16,12 +16,13 @@ DMAS-Forge is still under construction and being built. APIs may change as the p
 
 ## Examples
 
-Two example applications are provided in the [`examples/`](examples/) directory:
+Several example applications are provided in the [`examples/`](examples/) directory:
 
 | Example | Description | Agents | Key features |
 |---|---|---|---|
 | [weather](examples/weather/) | Multi-agent weather report with disaster risk assessment | 2 (WeatherAgent + DisasterAgent) | Tool use, inter-agent communication, multiple wiring specs (HTTP, A2A, MCP) |
 | [chat](examples/chat/) | Conversational agent with persistent memory | 1 (ChatAgent) | LLM-driven memory tools, decorator pattern, multi-round tool calls |
+| [rag_chat](examples/rag_chat/) | RAG chat with automatic and agentic retrieval modes | 1 (ChatAgent + RAG) | RAG, embeddings, vector store, configurable knowledge base |
 
 Each example has its own README with setup and usage instructions.
 
