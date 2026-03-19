@@ -1,3 +1,16 @@
+// Package vectorstore provides in-memory vector storage implementations.
+// The InMemoryVectorStore is suitable for development and testing, but
+// production deployments should use a persistent vector database.
+//
+// # Wiring Spec Usage
+//
+//	rag_plugin.VectorStore[vectorstore.InMemoryVectorStore](spec, "my_vector_store")
+//
+// This creates an InMemoryVectorStore named "my_vector_store". The store
+// can then be used as the backing storage for a KnowledgeBase implementation.
+//
+// The InMemoryVectorStore is safe for concurrent use as it uses mutexes when
+// accessing the underlying vector map.
 package vectorstore
 
 import (
@@ -14,16 +27,20 @@ type storedVector struct {
 	metadata map[string]any
 }
 
-// InMemoryVectorStore implements core.VectorStore using a thread-safe in-memory map.
+// InMemoryVectorStore implements core.VectorStore using a thread-safe
+// in-memory map. It uses cosine similarity for nearest-neighbor queries.
 type InMemoryVectorStore struct {
 	mu      sync.RWMutex
 	vectors map[string]storedVector
 }
 
+// NewInMemoryStore creates a new empty in-memory vector store.
 func NewInMemoryVectorStore(ctx context.Context) (*InMemoryVectorStore, error) {
 	return &InMemoryVectorStore{vectors: make(map[string]storedVector)}, nil
 }
 
+// Store saves a vector with its associated metadata under the given ID.
+// If a vector with the same ID exists, it is overwritten.
 func (s *InMemoryVectorStore) Store(ctx context.Context, id string, vector []float64, metadata map[string]any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -35,6 +52,9 @@ func (s *InMemoryVectorStore) Store(ctx context.Context, id string, vector []flo
 	return nil
 }
 
+// Query returns the topK vectors most similar to the query vector, ranked
+// by cosine similarity. Returns an empty slice if topK <= 0 or if the
+// query vector is zero-length.
 func (s *InMemoryVectorStore) Query(ctx context.Context, vector []float64, topK int) ([]core.VectorMatch, error) {
 	if topK <= 0 || len(vector) == 0 {
 		return []core.VectorMatch{}, nil
@@ -74,6 +94,7 @@ func (s *InMemoryVectorStore) Query(ctx context.Context, vector []float64, topK 
 	return matches[:topK], nil
 }
 
+// Delete removes the vector with the given ID. No-op if the ID does not exist.
 func (s *InMemoryVectorStore) Delete(ctx context.Context, id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -11,6 +11,9 @@ import (
 	ragruntime "github.com/vaastav/agentic_blueprint/ai_runtime/plugins/rag"
 )
 
+// OpenAIKnowledgeBaseClient is the Blueprint IR node for an OpenAI-backed
+// knowledge base. It uses OpenAI's embedding API and delegates vector storage
+// to a pluggable VectorStore implementation.
 type OpenAIKnowledgeBaseClient struct {
 	golang.Service
 	ir.IRNode

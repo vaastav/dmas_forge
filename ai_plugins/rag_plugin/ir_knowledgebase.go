@@ -11,6 +11,8 @@ import (
 	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
 )
 
+// KnowledgeBaseClient is the Blueprint IR node for a custom KnowledgeBase
+// implementation. It is instantiated via KnowledgeBase[Impl] wiring function.
 type KnowledgeBaseClient struct {
 	golang.Service
 	ir.IRNode

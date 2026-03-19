@@ -12,6 +12,9 @@ import (
 	ragruntime "github.com/vaastav/agentic_blueprint/ai_runtime/plugins/rag"
 )
 
+// RAGAgentClient is the Blueprint IR node for a RAG-enabled agent. It wraps
+// an existing agent and knowledge base, adding RAG capabilities transparently
+// to workflows that interact with it through core.Agent.
 type RAGAgentClient struct {
 	golang.Service
 	ir.IRNode

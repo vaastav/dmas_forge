@@ -22,7 +22,9 @@ type chunkRecord struct {
 	metadata map[string]any
 }
 
-// chunkDocument uses a sliding window approach to split a document into chunks.
+// chunkDocument implements a basic sliding window chunking algorithm.
+// It splits the given document content into overlapping chunks, using
+// a fixed word count and overlap size to create chunks of text.
 func chunkDocument(doc core.Document) ([]chunkRecord, error) {
 	if strings.TrimSpace(doc.ID) == "" {
 		return nil, fmt.Errorf("document ID cannot be empty")
@@ -45,10 +47,7 @@ func chunkDocument(doc core.Document) ([]chunkRecord, error) {
 	}
 
 	for start := 0; start < len(words); start += step {
-		end := start + defaultChunkWordCount
-		if end > len(words) {
-			end = len(words)
-		}
+		end := min(start+defaultChunkWordCount, len(words))
 
 		chunkText := strings.Join(words[start:end], " ")
 		chunkID := fmt.Sprintf("%s#chunk-%03d", doc.ID, len(chunks))
