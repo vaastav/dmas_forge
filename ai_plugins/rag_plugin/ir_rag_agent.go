@@ -24,10 +24,9 @@ type RAGAgentClient struct {
 	ToolExposure  ToolExposure
 	AutoQuery     bool
 	TopK          int
-	AutoIndex     bool
 }
 
-func newRAGAgentClient(name string, innerAgent ir.IRNode, knowledgeBase ir.IRNode, toolExposure ToolExposure, autoQuery bool, topK int, autoIndex bool) (*RAGAgentClient, error) {
+func newRAGAgentClient(name string, innerAgent ir.IRNode, knowledgeBase ir.IRNode, toolExposure ToolExposure, autoQuery bool, topK int) (*RAGAgentClient, error) {
 	spec, err := workflowspec.GetService[ragruntime.RAGAgent]()
 	if err != nil {
 		return nil, err
@@ -40,7 +39,6 @@ func newRAGAgentClient(name string, innerAgent ir.IRNode, knowledgeBase ir.IRNod
 		ToolExposure:  toolExposure,
 		AutoQuery:     autoQuery,
 		TopK:          topK,
-		AutoIndex:     autoIndex,
 	}, nil
 }
 
@@ -66,7 +64,6 @@ func (node *RAGAgentClient) AddInstantiation(builder golang.NamespaceBuilder) er
 		&ir.IRValue{Value: strconv.Itoa(int(node.ToolExposure))},
 		&ir.IRValue{Value: strconv.FormatBool(node.AutoQuery)},
 		&ir.IRValue{Value: strconv.Itoa(node.TopK)},
-		&ir.IRValue{Value: strconv.FormatBool(node.AutoIndex)},
 	})
 }
 

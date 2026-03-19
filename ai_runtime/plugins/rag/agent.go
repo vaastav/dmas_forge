@@ -3,10 +3,8 @@ package rag
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"strconv"
 	"strings"
-	"time"
 
 	openai "github.com/openai/openai-go"
 	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
@@ -24,7 +22,6 @@ type RAGAgentConfig struct {
 	ToolExposure ToolExposure `json:"tool_exposure"`
 	AutoQuery    bool         `json:"auto_query"`
 	TopK         int          `json:"top_k"`
-	AutoIndex    bool         `json:"auto_index"`
 }
 
 // RAGAgent is a decorator that adds retrieval-augmented generation capabilities to any core.Agent.
@@ -35,7 +32,7 @@ type RAGAgent struct {
 	userHandler core.ToolHandlerFn
 }
 
-func NewRAGAgent(ctx context.Context, agent core.Agent, kb core.KnowledgeBase, toolExposure string, autoQuery string, topK string, autoIndex string) (*RAGAgent, error) {
+func NewRAGAgent(ctx context.Context, agent core.Agent, kb core.KnowledgeBase, toolExposure string, autoQuery string, topK string) (*RAGAgent, error) {
 	toolExposureValue, err := strconv.Atoi(toolExposure)
 	if err != nil {
 		return nil, fmt.Errorf("rag agent: invalid tool exposure: %w", err)
@@ -48,16 +45,11 @@ func NewRAGAgent(ctx context.Context, agent core.Agent, kb core.KnowledgeBase, t
 	if err != nil {
 		return nil, fmt.Errorf("rag agent: invalid top_k: %w", err)
 	}
-	autoIndexValue, err := strconv.ParseBool(autoIndex)
-	if err != nil {
-		return nil, fmt.Errorf("rag agent: invalid auto_index: %w", err)
-	}
 
 	config := RAGAgentConfig{
 		ToolExposure: ToolExposure(toolExposureValue),
 		AutoQuery:    autoQueryValue,
 		TopK:         topKValue,
-		AutoIndex:    autoIndexValue,
 	}
 	switch config.ToolExposure {
 	case NoTools, SearchOnly, FullCRUD:
@@ -113,7 +105,6 @@ func (r *RAGAgent) LLMCall(ctx context.Context, query string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	r.IndexQuery(ctx, query, response)
 	return response, nil
 }
 
@@ -127,7 +118,6 @@ func (r *RAGAgent) LLMCallWithTools(ctx context.Context, query string) (string, 
 	if err != nil {
 		return "", err
 	}
-	r.IndexQuery(ctx, query, response)
 	return response, nil
 }
 
@@ -159,25 +149,4 @@ func (r *RAGAgent) prepareQuery(ctx context.Context, query string) (string, erro
 	builder.WriteString("\n\nUser request:\n")
 	builder.WriteString(query)
 	return builder.String(), nil
-}
-
-func (r *RAGAgent) IndexQuery(ctx context.Context, query string, response string) {
-	if !r.config.AutoIndex {
-		return
-	}
-
-	// TODO: Add proper ID generation
-	docId := strconv.FormatInt(time.Now().UTC().UnixNano(), 10) + strconv.Itoa(len(response))
-
-	doc := core.Document{
-		ID:      docId,
-		Content: fmt.Sprintf("User request:\n%s\n\nAssistant response:\n%s", query, response),
-		Metadata: map[string]any{
-			"kind":      "interaction",
-			"timestamp": time.Now().UTC(),
-		},
-	}
-	if err := r.kb.Index(ctx, doc); err != nil {
-		slog.Warn("rag agent: auto-index failed", "doc_id", doc.ID, "error", err)
-	}
 }
