@@ -54,7 +54,7 @@ func makeAutomaticSpec(spec wiring.WiringSpec) ([]string, error) {
 		TopK:         3,
 	})
 
-	chatCtr := deployChatService(spec, agent, kb, true, false, "")
+	chatCtr := deployChatService(spec, agent, kb, "*")
 	return []string{chatCtr}, nil
 }
 
@@ -71,7 +71,7 @@ func makeAgenticSpec(spec wiring.WiringSpec) ([]string, error) {
 		TopK:         3,
 	})
 
-	chatCtr := deployChatService(spec, agent, kb, false, true, "")
+	chatCtr := deployChatService(spec, agent, kb, "")
 	return []string{chatCtr}, nil
 }
 
@@ -103,8 +103,8 @@ func readModelInfo() (ModelInfo, error) {
 	return model, nil
 }
 
-func deployChatService(spec wiring.WiringSpec, agent string, kb string, startupIndex bool, enableFileTool bool, preIndexFiles string) string {
-	chatService := workflow.Service[wf.ChatAgent](spec, "chat_service", agent, kb, fmt.Sprintf("%t", startupIndex), fmt.Sprintf("%t", enableFileTool), preIndexFiles)
+func deployChatService(spec wiring.WiringSpec, agent string, kb string, preIndexFiles string) string {
+	chatService := workflow.Service[wf.ChatAgent](spec, "chat_service", agent, kb, preIndexFiles)
 	http.Deploy(spec, chatService)
 	goproc.Deploy(spec, chatService)
 	return linuxcontainer.Deploy(spec, chatService)
