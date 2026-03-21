@@ -1,25 +1,16 @@
 # RAG Chat Example
 
-A single-agent chat application that showcases three different wiring-time configurations for the RAG agent, each demonstrating different capabilities of retrieval-augmented generation.
+A single-agent chat application that showcases two different wiring configurations for the RAG agent, demonstrating different capabilities of the RAG plugin.
 
-## Architecture
-
-- **ChatAgentImpl** (`workflow/ChatAgent.go`) -- a minimal workflow that forwards messages to a `core.Agent`. Depending on the wiring, it can also index markdown files on startup and expose file-reading tools.
-- **RAGAgent** -- wraps the base OpenAI agent with automatic retrieval and optional CRUD tools.
-- **OpenAIKnowledgeBase** -- chunks documents, creates embeddings, and stores vectors in the configured vector store.
-- **InMemoryVectorStore** -- stores embeddings in process and performs cosine-similarity search.
-- **Corpus** (`workflow/data/*.md`) -- markdown files about sourdough baking used to demonstrate indexing strategies.
+This example utilizes the **OpenAIKnowledgeBase** and **InMemoryVectorStore** features, with the an example of a few sourdough baking reference files in `workflow/data/*.md`. 
 
 ## Configurations
 
-- **`automatic`**: All markdown files are indexed at startup, and relevant context is automatically retrieved and injected into the prompt before each query. The agent has no control over the knowledge base.
+We're demonstrating two configurations:
 
-- **`agentic`**: The agent starts with an empty knowledge base and must explicitly call tools to read files, index documents, and search for relevant context. This demonstrates full agent autonomy over knowledge management.
+- **`automatic`**: The retrieval process is `automatic`, where the RAG system gets pre-populated with documents and augments each incoming query with relevant chunks from these documents. The agent does not have any tools to review or modify the RAG system.
 
-### Configuration Details
-
-- **AutoQuery**: Automatically retrieves relevant context before each query and injects it into the prompt
-- **ToolExposure**: `NoTools` (agent cannot call RAG tools), `FullCRUD` (agent can search, index, and delete)
+- **`agentic`**: The retrival process is entirely driven by the agent. The RAG system starts empty and exposes CRUD tools to the agent. The agent then has to search or modify the knowledge base as appropriate.
 
 ## Setup
 
@@ -36,58 +27,28 @@ Edit `wiring/example_model.json` with your OpenAI-compatible chat model, embeddi
 
 ## Build and Run
 
-### Automatic
+Replace `<MODE>` with `automatic` or `agentic` in the following:
 
 ```bash
 cd examples/rag_chat/wiring
-go run main.go -w automatic -o build -modfile=./example_model.json
-cd build/automatic
-docker compose build && docker compose up -d
-```
-
-### Agentic
-
-```bash
-cd examples/rag_chat/wiring
-go run main.go -w agentic -o build -modfile=./example_model.json
-cd build/agentic
+go run main.go -w <MODE> -o build -modfile=./example_model.json
+cd build/docker
+cp ../.local.env .env
 docker compose build && docker compose up -d
 ```
 
 ## Usage
 
-### `automatic`
-
-Pure retrieval augmentation - the agent receives relevant context automatically but cannot modify the knowledge base:
-
 ```bash
+# Query about something in the knowledge base
 curl -s --get --data-urlencode "message=What hydration range does the guide recommend for everyday sourdough?" \
   http://localhost:12345/Chat | jq -r .Ret0
-
+  
+# Ask the agent to add to the knowledge base (should fail in `automatic` mode)
+curl -s --get --data-urlencode "message=Add a document to note that I like chocolate strawberry sourdough" \
+  http://localhost:12345/Chat | jq -r .Ret0
+  
 # Query outside knowledge base scope
 curl -s --get --data-urlencode "message=What is the capital of France?" \
   http://localhost:12345/Chat | jq -r .Ret0
 ```
-
-### `agentic`
-
-The agent has full control - it must explicitly search, and can read, index, and delete documents:
-
-```bash
-curl -s --get --data-urlencode "message=First, list the available knowledge files. Then read the troubleshooting guide, index it, and tell me how to fix a dense loaf." \
-  http://localhost:12345/Chat | jq -r .Ret0
-
-curl -s --get --data-urlencode "message=Now search the knowledge base for dense loaf solutions." \
-  http://localhost:12345/Chat | jq -r .Ret0
-
-# Query outside knowledge base scope
-curl -s --get --data-urlencode "message=What is the capital of France?" \
-  http://localhost:12345/Chat | jq -r .Ret0
-```
-
-In agentic mode, the model can call `list_knowledge_files` and `read_knowledge_file`, then use `index_document`, `search_knowledge`, and `delete_document` to manage the knowledge base itself.
-
-## Notes
-
-- The vector store is in-process and resets when the container restarts.
-- `agentic` requires the model to proactively use tools - smaller models may struggle with this autonomy.
