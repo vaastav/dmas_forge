@@ -3,40 +3,37 @@ package core
 import "context"
 
 // Document represents a single document to be indexed in the knowledge base.
-// This document should be split into chunks by the knowledge base implementation.
 type Document struct {
 	ID       string
 	Content  string
 	Metadata map[string]any
 }
 
-// Chunk represents a single chunk of a document, used for retrieval and generation.
-// Each chunk has a score indicating its relevance to the query, and a source document ID.
+// Chunk represents a single chunk of a document to be retrieved during a query.
 type Chunk struct {
-	Content     string
-	Score       float64
+	// the text content of the chunk
+	Content string
+
+	// the similarity score between the chunk and the query
+	Score float64
+
+	// the ID of the source document this chunk belongs to
 	SourceDocID string
-	Metadata    map[string]any
+
+	// Optional metadata associated with this chunk (e.g. timestamp)
+	Metadata map[string]any
 }
 
 // KnowledgeBase defines the interface for RAG knowledge storage.
-// Implementations handle document chunking, embedding generation, and similarity search.
-//
-// The typical workflow is:
-//   - Index: Split document intochunks, generate embeddings, store in vector store
-//   - Query: Generate query embedding, find similar chunks via vector search
-//   - Delete: Remove all chunks associated with a document
-//
-// A KnowledgeBase differs from a raw VectorStore in that it manages the full
-// pipeline of chunking documents and generating embeddings, while a VectorStore
-// only handles raw vector operations.
-//
-// Additionally, this interface allows you to implement more advanced features such as:
-//   - Hybrid search (vector + keyword search)
-//   - Reranker (re-rank search results based on relevance)
-//   - Metadata filtering
+// Implementations should handle document chunking, embedding generation, and
+// similarity search.
 type KnowledgeBase interface {
+	// Split the given document into chunks, generate their embeddings, and store them
 	Index(ctx context.Context, doc Document) error
+
+	// Generate an embedding for the query, retrieving the topK most similar chunks
 	Query(ctx context.Context, query string, topK int) ([]Chunk, error)
+
+	// Remove all chunks associated with the given document ID
 	Delete(ctx context.Context, docID string) error
 }

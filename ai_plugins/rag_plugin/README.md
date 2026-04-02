@@ -27,21 +27,22 @@ rag_plugin.RAGAgent(spec, "my_agent", "base_agent", "my_kb", rag_plugin.RAGAgent
 })
 ```
 
-### Custom KnowledgeBase Implementations
+### Custom KnowledgeBase and VectorStore Implementations
 
 To use a custom KnowledgeBase implementation:
 
 ```
 rag_plugin.KnowledgeBase[MyCustomKB](spec, "my_kb")
+rag_plugin.VectorStore[MyCustomVS](spec, "my_vector_store")
 ```
 
-The implementation must satisfy the core.KnowledgeBase interface.
+The implementation types \(MyCustomKB, MyCustomVS\) must satisfy their respective core.KnowledgeBase and core.VectorStore interfaces.
 
 ### Tool Exposure Modes
 
-- NoTools: No RAG tools exposed. Use with AutoQuery for transparent context injection.
-- SearchOnly: Exposes search\_knowledge tool for read\-only KB access.
-- FullCRUD: Exposes all RAG tools \(search\_knowledge, index\_document, delete\_document\).
+- NoTools: No RAG tools exposed.
+- SearchOnly: Exposes read\-only tools to the knowledge base.
+- FullCRUD: Exposes read and write tools to the knowledge base.
 
 ## Index
 
@@ -105,45 +106,39 @@ const (
 func KnowledgeBase[Impl core.KnowledgeBase](spec wiring.WiringSpec, name string) string
 ```
 
-KnowledgeBase creates a Blueprint service node for a custom KnowledgeBase implementation. The implementation type must satisfy core.KnowledgeBase and follow Blueprint's SkipWorkflow DI conventions.
+KnowledgeBase creates a Blueprint service node for a custom KnowledgeBase implementation.
 
 <a name="OpenAIKnowledgeBase"></a>
-## func [OpenAIKnowledgeBase](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L85>)
+## func [OpenAIKnowledgeBase](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L84>)
 
 ```go
 func OpenAIKnowledgeBase(spec wiring.WiringSpec, name string, openaiURL string, apiKey string, embeddingModel string, vectorStoreName string) string
 ```
 
-OpenAIKnowledgeBase creates a Blueprint service node for an OpenAI\-backed knowledge base. The vectorStoreName must refer to a previously created VectorStore service.
+OpenAIKnowledgeBase creates a Blueprint service node for an OpenAI\-backed knowledge base. vectorStoreName must refer to a previously created VectorStore service.
 
 <a name="RAGAgent"></a>
-## func [RAGAgent](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L108>)
+## func [RAGAgent](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L102>)
 
 ```go
 func RAGAgent(spec wiring.WiringSpec, name string, baseAgent string, kb string, config RAGAgentConfig) string
 ```
 
-RAGAgent creates a Blueprint service node that wraps an existing agent with RAG capabilities. The baseAgent must refer to a previously created core.Agent service, and kb must refer to a KnowledgeBase service.
-
-The config parameter controls tool exposure and auto\-query behavior:
-
-- ToolExposure: NoTools, SearchOnly, or FullCRUD
-- AutoQuery: When true, queries are enriched with KB context automatically
-- TopK: Number of chunks to retrieve when auto\-query is enabled
+RAGAgent creates a Blueprint service node that wraps an existing agent with RAG capabilities. baseAgent and kb must refer to previously created core.Agent and KnowledgeBase services, respectively.
 
 <a name="VectorStore"></a>
-## func [VectorStore](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L71>)
+## func [VectorStore](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L70>)
 
 ```go
 func VectorStore[Impl core.VectorStore](spec wiring.WiringSpec, name string) string
 ```
 
-VectorStore creates a Blueprint service node for a custom VectorStore implementation. The implementation type must satisfy core.VectorStore and follow Blueprint's SkipWorkflow DI conventions.
+VectorStore creates a Blueprint service node for a custom VectorStore implementation.
 
 <a name="KnowledgeBaseClient"></a>
-## type [KnowledgeBaseClient](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L16-L23>)
+## type [KnowledgeBaseClient](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L15-L22>)
 
-KnowledgeBaseClient is the Blueprint IR node for a custom KnowledgeBase implementation. It is instantiated via KnowledgeBase\[Impl\] wiring function.
+KnowledgeBaseClient is instantiated via KnowledgeBase\[Impl\] wiring function.
 
 ```go
 type KnowledgeBaseClient struct {
@@ -157,7 +152,7 @@ type KnowledgeBaseClient struct {
 ```
 
 <a name="KnowledgeBaseClient.AddInstantiation"></a>
-### func \(\*KnowledgeBaseClient\) [AddInstantiation](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L41>)
+### func \(\*KnowledgeBaseClient\) [AddInstantiation](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L40>)
 
 ```go
 func (node *KnowledgeBaseClient) AddInstantiation(builder golang.NamespaceBuilder) error
@@ -166,7 +161,7 @@ func (node *KnowledgeBaseClient) AddInstantiation(builder golang.NamespaceBuilde
 
 
 <a name="KnowledgeBaseClient.AddInterfaces"></a>
-### func \(\*KnowledgeBaseClient\) [AddInterfaces](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L56>)
+### func \(\*KnowledgeBaseClient\) [AddInterfaces](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L55>)
 
 ```go
 func (node *KnowledgeBaseClient) AddInterfaces(builder golang.ModuleBuilder) error
@@ -175,7 +170,7 @@ func (node *KnowledgeBaseClient) AddInterfaces(builder golang.ModuleBuilder) err
 
 
 <a name="KnowledgeBaseClient.AddToWorkspace"></a>
-### func \(\*KnowledgeBaseClient\) [AddToWorkspace](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L52>)
+### func \(\*KnowledgeBaseClient\) [AddToWorkspace](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L51>)
 
 ```go
 func (node *KnowledgeBaseClient) AddToWorkspace(builder golang.WorkspaceBuilder) error
@@ -184,7 +179,7 @@ func (node *KnowledgeBaseClient) AddToWorkspace(builder golang.WorkspaceBuilder)
 
 
 <a name="KnowledgeBaseClient.GetInterface"></a>
-### func \(\*KnowledgeBaseClient\) [GetInterface](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L60>)
+### func \(\*KnowledgeBaseClient\) [GetInterface](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L59>)
 
 ```go
 func (node *KnowledgeBaseClient) GetInterface(ctx ir.BuildContext) (service.ServiceInterface, error)
@@ -193,7 +188,7 @@ func (node *KnowledgeBaseClient) GetInterface(ctx ir.BuildContext) (service.Serv
 
 
 <a name="KnowledgeBaseClient.ImplementsGolangNode"></a>
-### func \(\*KnowledgeBaseClient\) [ImplementsGolangNode](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L64>)
+### func \(\*KnowledgeBaseClient\) [ImplementsGolangNode](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L63>)
 
 ```go
 func (node *KnowledgeBaseClient) ImplementsGolangNode()
@@ -202,7 +197,7 @@ func (node *KnowledgeBaseClient) ImplementsGolangNode()
 
 
 <a name="KnowledgeBaseClient.Name"></a>
-### func \(\*KnowledgeBaseClient\) [Name](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L33>)
+### func \(\*KnowledgeBaseClient\) [Name](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L32>)
 
 ```go
 func (node *KnowledgeBaseClient) Name() string
@@ -211,7 +206,7 @@ func (node *KnowledgeBaseClient) Name() string
 
 
 <a name="KnowledgeBaseClient.String"></a>
-### func \(\*KnowledgeBaseClient\) [String](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L37>)
+### func \(\*KnowledgeBaseClient\) [String](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_knowledgebase.go#L36>)
 
 ```go
 func (node *KnowledgeBaseClient) String() string
@@ -303,9 +298,9 @@ func (node *OpenAIKnowledgeBaseClient) String() string
 
 
 <a name="RAGAgentClient"></a>
-## type [RAGAgentClient](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L18-L30>)
+## type [RAGAgentClient](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L17-L29>)
 
-RAGAgentClient is the Blueprint IR node for a RAG\-enabled agent. It wraps an existing agent and knowledge base, adding RAG capabilities transparently to workflows that interact with it through core.Agent.
+RAGAgentClient is the Blueprint IR node for a RAG\-enabled agent. It adds RAG capabilities to a core.Agent.
 
 ```go
 type RAGAgentClient struct {
@@ -324,7 +319,7 @@ type RAGAgentClient struct {
 ```
 
 <a name="RAGAgentClient.AddInstantiation"></a>
-### func \(\*RAGAgentClient\) [AddInstantiation](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L56>)
+### func \(\*RAGAgentClient\) [AddInstantiation](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L55>)
 
 ```go
 func (node *RAGAgentClient) AddInstantiation(builder golang.NamespaceBuilder) error
@@ -333,7 +328,7 @@ func (node *RAGAgentClient) AddInstantiation(builder golang.NamespaceBuilder) er
 
 
 <a name="RAGAgentClient.AddInterfaces"></a>
-### func \(\*RAGAgentClient\) [AddInterfaces](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L77>)
+### func \(\*RAGAgentClient\) [AddInterfaces](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L76>)
 
 ```go
 func (node *RAGAgentClient) AddInterfaces(builder golang.ModuleBuilder) error
@@ -342,7 +337,7 @@ func (node *RAGAgentClient) AddInterfaces(builder golang.ModuleBuilder) error
 
 
 <a name="RAGAgentClient.AddToWorkspace"></a>
-### func \(\*RAGAgentClient\) [AddToWorkspace](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L73>)
+### func \(\*RAGAgentClient\) [AddToWorkspace](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L72>)
 
 ```go
 func (node *RAGAgentClient) AddToWorkspace(builder golang.WorkspaceBuilder) error
@@ -351,7 +346,7 @@ func (node *RAGAgentClient) AddToWorkspace(builder golang.WorkspaceBuilder) erro
 
 
 <a name="RAGAgentClient.GetInterface"></a>
-### func \(\*RAGAgentClient\) [GetInterface](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L81>)
+### func \(\*RAGAgentClient\) [GetInterface](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L80>)
 
 ```go
 func (node *RAGAgentClient) GetInterface(ctx ir.BuildContext) (service.ServiceInterface, error)
@@ -360,7 +355,7 @@ func (node *RAGAgentClient) GetInterface(ctx ir.BuildContext) (service.ServiceIn
 
 
 <a name="RAGAgentClient.ImplementsGolangNode"></a>
-### func \(\*RAGAgentClient\) [ImplementsGolangNode](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L85>)
+### func \(\*RAGAgentClient\) [ImplementsGolangNode](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L84>)
 
 ```go
 func (node *RAGAgentClient) ImplementsGolangNode()
@@ -369,7 +364,7 @@ func (node *RAGAgentClient) ImplementsGolangNode()
 
 
 <a name="RAGAgentClient.Name"></a>
-### func \(\*RAGAgentClient\) [Name](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L48>)
+### func \(\*RAGAgentClient\) [Name](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L47>)
 
 ```go
 func (node *RAGAgentClient) Name() string
@@ -378,7 +373,7 @@ func (node *RAGAgentClient) Name() string
 
 
 <a name="RAGAgentClient.String"></a>
-### func \(\*RAGAgentClient\) [String](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L52>)
+### func \(\*RAGAgentClient\) [String](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L51>)
 
 ```go
 func (node *RAGAgentClient) String() string
@@ -387,7 +382,7 @@ func (node *RAGAgentClient) String() string
 
 
 <a name="RAGAgentConfig"></a>
-## type [RAGAgentConfig](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L52>)
+## type [RAGAgentConfig](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L53>)
 
 
 
@@ -396,7 +391,7 @@ type RAGAgentConfig = ragruntime.RAGAgentConfig
 ```
 
 <a name="ToolExposure"></a>
-## type [ToolExposure](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L44>)
+## type [ToolExposure](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L45>)
 
 
 
@@ -405,9 +400,9 @@ type ToolExposure = ragruntime.ToolExposure
 ```
 
 <a name="VectorStoreClient"></a>
-## type [VectorStoreClient](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L16-L23>)
+## type [VectorStoreClient](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L15-L22>)
 
-VectorStoreClient is the Blueprint IR node for a VectorStore service. It is instantiated via VectorStore\[Impl\] wiring function.
+VectorStoreClient is instantiated via VectorStore\[Impl\] wiring function.
 
 ```go
 type VectorStoreClient struct {
@@ -421,7 +416,7 @@ type VectorStoreClient struct {
 ```
 
 <a name="VectorStoreClient.AddInstantiation"></a>
-### func \(\*VectorStoreClient\) [AddInstantiation](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L41>)
+### func \(\*VectorStoreClient\) [AddInstantiation](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L40>)
 
 ```go
 func (node *VectorStoreClient) AddInstantiation(builder golang.NamespaceBuilder) error
@@ -430,7 +425,7 @@ func (node *VectorStoreClient) AddInstantiation(builder golang.NamespaceBuilder)
 
 
 <a name="VectorStoreClient.AddInterfaces"></a>
-### func \(\*VectorStoreClient\) [AddInterfaces](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L56>)
+### func \(\*VectorStoreClient\) [AddInterfaces](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L55>)
 
 ```go
 func (node *VectorStoreClient) AddInterfaces(builder golang.ModuleBuilder) error
@@ -439,7 +434,7 @@ func (node *VectorStoreClient) AddInterfaces(builder golang.ModuleBuilder) error
 
 
 <a name="VectorStoreClient.AddToWorkspace"></a>
-### func \(\*VectorStoreClient\) [AddToWorkspace](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L52>)
+### func \(\*VectorStoreClient\) [AddToWorkspace](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L51>)
 
 ```go
 func (node *VectorStoreClient) AddToWorkspace(builder golang.WorkspaceBuilder) error
@@ -448,7 +443,7 @@ func (node *VectorStoreClient) AddToWorkspace(builder golang.WorkspaceBuilder) e
 
 
 <a name="VectorStoreClient.GetInterface"></a>
-### func \(\*VectorStoreClient\) [GetInterface](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L60>)
+### func \(\*VectorStoreClient\) [GetInterface](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L59>)
 
 ```go
 func (node *VectorStoreClient) GetInterface(ctx ir.BuildContext) (service.ServiceInterface, error)
@@ -457,7 +452,7 @@ func (node *VectorStoreClient) GetInterface(ctx ir.BuildContext) (service.Servic
 
 
 <a name="VectorStoreClient.ImplementsGolangNode"></a>
-### func \(\*VectorStoreClient\) [ImplementsGolangNode](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L64>)
+### func \(\*VectorStoreClient\) [ImplementsGolangNode](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L63>)
 
 ```go
 func (node *VectorStoreClient) ImplementsGolangNode()
@@ -466,7 +461,7 @@ func (node *VectorStoreClient) ImplementsGolangNode()
 
 
 <a name="VectorStoreClient.Name"></a>
-### func \(\*VectorStoreClient\) [Name](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L33>)
+### func \(\*VectorStoreClient\) [Name](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L32>)
 
 ```go
 func (node *VectorStoreClient) Name() string
@@ -475,7 +470,7 @@ func (node *VectorStoreClient) Name() string
 
 
 <a name="VectorStoreClient.String"></a>
-### func \(\*VectorStoreClient\) [String](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L37>)
+### func \(\*VectorStoreClient\) [String](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L36>)
 
 ```go
 func (node *VectorStoreClient) String() string

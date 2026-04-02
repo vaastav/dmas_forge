@@ -25,9 +25,8 @@ type OpenAIKnowledgeBase struct {
 	docChunks map[string][]string
 }
 
-// NewOpenAIKnowledgeBase creates a knowledge base that uses OpenAI's embedding
-// API and the provided vector store. The embeddingModel should be an OpenAI
-// embedding model name (e.g., "text-embedding-3-small").
+// The embeddingModel should be an OpenAI embedding model name (e.g.,
+// "text-embedding-3-small").
 func NewOpenAIKnowledgeBase(ctx context.Context, openaiURL string, apiKey string, embeddingModel string, vectorStore core.VectorStore) (*OpenAIKnowledgeBase, error) {
 	client := openai.NewClient(option.WithBaseURL(openaiURL), option.WithAPIKey(apiKey))
 	return &OpenAIKnowledgeBase{
@@ -38,15 +37,13 @@ func NewOpenAIKnowledgeBase(ctx context.Context, openaiURL string, apiKey string
 	}, nil
 }
 
-// Index inserts a document into the knowledge base. It splits the document into chunks,
-// generates embeddings via OpenAI's API, and stores each chunk in the vector store.
-// Existing chunks for the same document ID are deleted before indexing new ones.
 func (kb *OpenAIKnowledgeBase) Index(ctx context.Context, doc core.Document) error {
 	chunks, err := chunkDocument(doc)
 	if err != nil {
 		return err
 	}
 
+	// Delete any existing chunks with this document ID
 	if err := kb.Delete(ctx, doc.ID); err != nil {
 		return err
 	}
@@ -95,9 +92,6 @@ func (kb *OpenAIKnowledgeBase) Index(ctx context.Context, doc core.Document) err
 	return nil
 }
 
-// Query generates an embedding for the query text and finds the topK most
-// similar chunks in the vector store. Returns the chunks with their content,
-// similarity scores, source document IDs, and metadata.
 func (kb *OpenAIKnowledgeBase) Query(ctx context.Context, query string, topK int) ([]core.Chunk, error) {
 	if topK <= 0 || strings.TrimSpace(query) == "" {
 		return []core.Chunk{}, nil
@@ -139,8 +133,6 @@ func (kb *OpenAIKnowledgeBase) Query(ctx context.Context, query string, topK int
 	return chunks, nil
 }
 
-// Delete removes all chunks associated with the given document ID from both
-// the vector store and the internal chunk tracking map.
 func (kb *OpenAIKnowledgeBase) Delete(ctx context.Context, docID string) error {
 	kb.mu.Lock()
 	chunkIDs := append([]string(nil), kb.docChunks[docID]...)

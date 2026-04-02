@@ -18,19 +18,20 @@
 //	    TopK:         5,
 //	})
 //
-// # Custom KnowledgeBase Implementations
+// # Custom KnowledgeBase and VectorStore Implementations
 //
 // To use a custom KnowledgeBase implementation:
 //
 //	rag_plugin.KnowledgeBase[MyCustomKB](spec, "my_kb")
+//	rag_plugin.VectorStore[MyCustomVS](spec, "my_vector_store")
 //
-// The implementation must satisfy the core.KnowledgeBase interface.
+// The implementation types (MyCustomKB, MyCustomVS) must satisfy their respective core.KnowledgeBase and core.VectorStore interfaces.
 //
 // # Tool Exposure Modes
 //
-//   - NoTools: No RAG tools exposed. Use with AutoQuery for transparent context injection.
-//   - SearchOnly: Exposes search_knowledge tool for read-only KB access.
-//   - FullCRUD: Exposes all RAG tools (search_knowledge, index_document, delete_document).
+//   - NoTools: No RAG tools exposed.
+//   - SearchOnly: Exposes read-only tools to the knowledge base.
+//   - FullCRUD: Exposes read and write tools to the knowledge base.
 package rag_plugin
 
 import (
@@ -52,8 +53,7 @@ const (
 type RAGAgentConfig = ragruntime.RAGAgentConfig
 
 // KnowledgeBase creates a Blueprint service node for a custom KnowledgeBase
-// implementation. The implementation type must satisfy core.KnowledgeBase
-// and follow Blueprint's SkipWorkflow DI conventions.
+// implementation.
 func KnowledgeBase[Impl core.KnowledgeBase](spec wiring.WiringSpec, name string) string {
 	backendName := name + ".knowledge_base"
 
@@ -66,8 +66,7 @@ func KnowledgeBase[Impl core.KnowledgeBase](spec wiring.WiringSpec, name string)
 }
 
 // VectorStore creates a Blueprint service node for a custom VectorStore
-// implementation. The implementation type must satisfy core.VectorStore
-// and follow Blueprint's SkipWorkflow DI conventions.
+// implementation.
 func VectorStore[Impl core.VectorStore](spec wiring.WiringSpec, name string) string {
 	backendName := name + ".vector_store"
 
@@ -80,7 +79,7 @@ func VectorStore[Impl core.VectorStore](spec wiring.WiringSpec, name string) str
 }
 
 // OpenAIKnowledgeBase creates a Blueprint service node for an OpenAI-backed
-// knowledge base. The vectorStoreName must refer to a previously created
+// knowledge base. vectorStoreName must refer to a previously created
 // VectorStore service.
 func OpenAIKnowledgeBase(spec wiring.WiringSpec, name string, openaiURL string, apiKey string, embeddingModel string, vectorStoreName string) string {
 	backendName := name + ".openai_knowledge_base"
@@ -97,14 +96,9 @@ func OpenAIKnowledgeBase(spec wiring.WiringSpec, name string, openaiURL string, 
 	return name
 }
 
-// RAGAgent creates a Blueprint service node that wraps an existing agent
-// with RAG capabilities. The baseAgent must refer to a previously created
-// core.Agent service, and kb must refer to a KnowledgeBase service.
-//
-// The config parameter controls tool exposure and auto-query behavior:
-//   - ToolExposure: NoTools, SearchOnly, or FullCRUD
-//   - AutoQuery: When true, queries are enriched with KB context automatically
-//   - TopK: Number of chunks to retrieve when auto-query is enabled
+// RAGAgent creates a Blueprint service node that wraps an existing agent with
+// RAG capabilities. baseAgent and kb must refer to previously created
+// core.Agent and KnowledgeBase services, respectively.
 func RAGAgent(spec wiring.WiringSpec, name string, baseAgent string, kb string, config RAGAgentConfig) string {
 	backendName := name + ".rag_agent"
 

@@ -11,8 +11,7 @@ import (
 	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
 )
 
-// VectorStoreClient is the Blueprint IR node for a VectorStore service.
-// It is instantiated via VectorStore[Impl] wiring function.
+// VectorStoreClient is instantiated via VectorStore[Impl] wiring function.
 type VectorStoreClient struct {
 	golang.Service
 	ir.IRNode

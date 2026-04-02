@@ -11,7 +11,10 @@ Package rag provides retrieval\-augmented generation capabilities for agents.
 ### Wiring Spec Usage
 
 ```
-rag_plugin.RAGAgent(spec, "my_agent", "existing_agent", "my_kb", rag_plugin.RAGAgentConfig{
+my_vector_store := rag_plugin.VectorStore[*vectorstore.InMemoryVectorStore](spec, "my_vector_store")
+my_kb := rag_plugin.OpenAIKnowledgeBase(spec, "my_kb", "https://api.openai.com", "api-key", "text-embedding-3-small", "my_vector_store")
+existing_agent := openai_plugin.OpenAILLMAgent(spec, "existing_agent", "https://api.openai.com", "api-key", "gpt-5.4-nano", openai_plugin.AgentConfig{})
+my_agent := rag_plugin.RAGAgent(spec, "my_agent", "existing_agent", "my_kb", rag_plugin.RAGAgentConfig{
     ToolExposure: rag_plugin.SearchOnly,
     AutoQuery:    true,
     TopK:         5,
@@ -22,23 +25,19 @@ This creates a new RAGAgent named "my\_agent" that wraps "existing\_agent" and u
 
 ### Architecture
 
-The package implements a decorator pattern around \[core.Agent\]. The [RAGAgent](<#RAGAgent>) type adds retrieval capabilities in two different modes:
+The package provides a [RAGAgent](<#RAGAgent>) that can wrap any \[core.Agent\] implementation, adding retrieval capabilities in two different modes:
 
-1. Tool exposure: When configured with SearchOnly or FullCRUD, the agent exposes knowledge base tools \(search\_knowledge, index\_document, delete\_document\) that the LLM can call autonomously.
+1. Tool exposure: When configured with SearchOnly or FullCRUD, the agent exposes knowledge base tools \(search\_knowledge, index\_document, delete\_document\) that the agent can call autonomously.
 
-2. Auto\-query: When enabled, all queries are automatically augmented with relevant context from the knowledge base before being sent to the LLM. This is invisible to the workflow and requires no tool calls.
+2. Auto\-query: When enabled, all queries are automatically augmented with relevant context from the knowledge base before being sent to the agent. This requires no tool calls.
 
-The two modes can be used independently or together. With NoTools, the agent functions purely as an auto\-query wrapper. With SearchOnly and AutoQuery disabled, the LLM must explicitly call search\_knowledge.
+The two modes can be used independently or together. With NoTools, the agent functions purely as an auto\-query wrapper. With SearchOnly and AutoQuery disabled, the agent must explicitly call search\_knowledge.
 
 ### Tool Exposure Levels
 
-- NoTools: No RAG tools exposed. Useful with AutoQuery enabled for transparent context injection without LLM awareness.
-- SearchOnly: Exposes search\_knowledge tool. The LLM can query the KB but cannot modify it. Suitable for read\-only knowledge bases.
-- FullCRUD: Exposes all RAG tools. The LLM can search, index, and delete documents. Useful for dynamic knowledge bases.
-
-### Knowledge Base vs Vector Store
-
-A \[core.KnowledgeBase\] manages the full RAG pipeline: document chunking, embedding generation, and semantic search. It internally uses a \[core.VectorStore\] for raw vector operations. The [OpenAIKnowledgeBase](<#OpenAIKnowledgeBase>) implementation uses OpenAI's embedding API and is pluggable with any VectorStore implementation.
+- NoTools: No RAG tools exposed.
+- SearchOnly: Exposes search\_knowledge tool. The agent can query the KB but cannot modify it.
+- FullCRUD: Exposes all RAG tools. The agent can search, index, and delete documents.
 
 ## Index
 
@@ -70,47 +69,45 @@ type OpenAIKnowledgeBase struct {
 ```
 
 <a name="NewOpenAIKnowledgeBase"></a>
-### func [NewOpenAIKnowledgeBase](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L31>)
+### func [NewOpenAIKnowledgeBase](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L30>)
 
 ```go
 func NewOpenAIKnowledgeBase(ctx context.Context, openaiURL string, apiKey string, embeddingModel string, vectorStore core.VectorStore) (*OpenAIKnowledgeBase, error)
 ```
 
-NewOpenAIKnowledgeBase creates a knowledge base that uses OpenAI's embedding API and the provided vector store. The embeddingModel should be an OpenAI embedding model name \(e.g., "text\-embedding\-3\-small"\).
+The embeddingModel should be an OpenAI embedding model name \(e.g., "text\-embedding\-3\-small"\).
 
 <a name="OpenAIKnowledgeBase.Delete"></a>
-### func \(\*OpenAIKnowledgeBase\) [Delete](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L144>)
+### func \(\*OpenAIKnowledgeBase\) [Delete](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L136>)
 
 ```go
 func (kb *OpenAIKnowledgeBase) Delete(ctx context.Context, docID string) error
 ```
 
-Delete removes all chunks associated with the given document ID from both the vector store and the internal chunk tracking map.
+
 
 <a name="OpenAIKnowledgeBase.Index"></a>
-### func \(\*OpenAIKnowledgeBase\) [Index](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L44>)
+### func \(\*OpenAIKnowledgeBase\) [Index](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L40>)
 
 ```go
 func (kb *OpenAIKnowledgeBase) Index(ctx context.Context, doc core.Document) error
 ```
 
-Index inserts a document into the knowledge base. It splits the document into chunks, generates embeddings via OpenAI's API, and stores each chunk in the vector store. Existing chunks for the same document ID are deleted before indexing new ones.
+
 
 <a name="OpenAIKnowledgeBase.Query"></a>
-### func \(\*OpenAIKnowledgeBase\) [Query](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L101>)
+### func \(\*OpenAIKnowledgeBase\) [Query](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L95>)
 
 ```go
 func (kb *OpenAIKnowledgeBase) Query(ctx context.Context, query string, topK int) ([]core.Chunk, error)
 ```
 
-Query generates an embedding for the query text and finds the topK most similar chunks in the vector store. Returns the chunks with their content, similarity scores, source document IDs, and metadata.
+
 
 <a name="RAGAgent"></a>
-## type [RAGAgent](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L80-L85>)
+## type [RAGAgent](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L74-L79>)
 
-RAGAgent is a decorator that wraps any core.Agent with retrieval\-augmented generation capabilities.
 
-Workflows interact with RAGAgent through the core.Agent interface and are unaware of RAG capabilities. Whether an agent has RAG is a wiring decision.
 
 ```go
 type RAGAgent struct {
@@ -119,25 +116,25 @@ type RAGAgent struct {
 ```
 
 <a name="NewRAGAgent"></a>
-### func [NewRAGAgent](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L89>)
+### func [NewRAGAgent](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L81>)
 
 ```go
 func NewRAGAgent(ctx context.Context, agent core.Agent, kb core.KnowledgeBase, toolExposure string, autoQuery string, topK string) (*RAGAgent, error)
 ```
 
-NewRAGAgent wraps the given agent with RAG capabilities. Parameters are passed as strings for compatibility with the wiring system.
+
 
 <a name="RAGAgent.AddSystemPrompt"></a>
-### func \(\*RAGAgent\) [AddSystemPrompt](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L128>)
+### func \(\*RAGAgent\) [AddSystemPrompt](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L117>)
 
 ```go
 func (r *RAGAgent) AddSystemPrompt(ctx context.Context, prompt string) error
 ```
 
-AddSystemPrompt appends RAG\-specific instructions to the user's prompt and forwards it to the inner agent. The instructions vary based on tool exposure and auto\-query configuration.
+
 
 <a name="RAGAgent.AddTools"></a>
-### func \(\*RAGAgent\) [AddTools](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L154>)
+### func \(\*RAGAgent\) [AddTools](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L143>)
 
 ```go
 func (r *RAGAgent) AddTools(ctx context.Context, tooldefs map[string]openai.ChatCompletionToolParam) error
@@ -146,47 +143,52 @@ func (r *RAGAgent) AddTools(ctx context.Context, tooldefs map[string]openai.Chat
 
 
 <a name="RAGAgent.LLMCall"></a>
-### func \(\*RAGAgent\) [LLMCall](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L160>)
+### func \(\*RAGAgent\) [LLMCall](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L147>)
 
 ```go
 func (r *RAGAgent) LLMCall(ctx context.Context, query string) (string, error)
 ```
 
-If AutoQuery is enabled, the query is augmented with relevant knowledge base context before being sent to the LLM. Otherwise, the query is sent as\-is.
+
 
 <a name="RAGAgent.LLMCallWithTools"></a>
-### func \(\*RAGAgent\) [LLMCallWithTools](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L175>)
+### func \(\*RAGAgent\) [LLMCallWithTools](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L160>)
 
 ```go
 func (r *RAGAgent) LLMCallWithTools(ctx context.Context, query string) (string, error)
 ```
 
-If AutoQuery is enabled, the query is augmented with relevant knowledge base context before being sent to the LLM. Otherwise, the query is sent as\-is.
+
 
 <a name="RAGAgent.RegisterToolCallHandler"></a>
-### func \(\*RAGAgent\) [RegisterToolCallHandler](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L190>)
+### func \(\*RAGAgent\) [RegisterToolCallHandler](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L173>)
 
 ```go
 func (r *RAGAgent) RegisterToolCallHandler(ctx context.Context, toolHandlerFn core.ToolHandlerFn) error
 ```
 
-RegisterToolCallHandler handles RAG tool calls and delegates everything else to the user's handler.
+
 
 <a name="RAGAgentConfig"></a>
-## type [RAGAgentConfig](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L69-L73>)
+## type [RAGAgentConfig](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L63-L72>)
 
 
 
 ```go
 type RAGAgentConfig struct {
+    // ToolExposure determines which RAG tools (if any) are exposed to the underlying agent.
     ToolExposure ToolExposure `json:"tool_exposure"`
-    AutoQuery    bool         `json:"auto_query"`
-    TopK         int          `json:"top_k"`
+
+    // AutoQuery controls whether context is automatically injected into queries.
+    AutoQuery bool `json:"auto_query"`
+
+    // TopK specifies how many relevant chunks to retrieve for auto-query.
+    TopK int `json:"top_k"`
 }
 ```
 
 <a name="ToolExposure"></a>
-## type [ToolExposure](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L61>)
+## type [ToolExposure](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/agent.go#L55>)
 
 
 

@@ -2,7 +2,10 @@
 //
 // # Wiring Spec Usage
 //
-//	rag_plugin.RAGAgent(spec, "my_agent", "existing_agent", "my_kb", rag_plugin.RAGAgentConfig{
+//	my_vector_store := rag_plugin.VectorStore[*vectorstore.InMemoryVectorStore](spec, "my_vector_store")
+//	my_kb := rag_plugin.OpenAIKnowledgeBase(spec, "my_kb", "https://api.openai.com", "api-key", "text-embedding-3-small", "my_vector_store")
+//	existing_agent := openai_plugin.OpenAILLMAgent(spec, "existing_agent", "https://api.openai.com", "api-key", "gpt-5.4-nano", openai_plugin.AgentConfig{})
+//	my_agent := rag_plugin.RAGAgent(spec, "my_agent", "existing_agent", "my_kb", rag_plugin.RAGAgentConfig{
 //	    ToolExposure: rag_plugin.SearchOnly,
 //	    AutoQuery:    true,
 //	    TopK:         5,
@@ -15,37 +18,28 @@
 //
 // # Architecture
 //
-// The package implements a decorator pattern around [core.Agent]. The
-// [RAGAgent] type adds retrieval capabilities in two different modes:
+// The package provides a [RAGAgent] that can wrap any [core.Agent]
+// implementation, adding retrieval capabilities in two different modes:
 //
 //  1. Tool exposure: When configured with SearchOnly or FullCRUD, the agent
 //     exposes knowledge base tools (search_knowledge, index_document,
-//     delete_document) that the LLM can call autonomously.
+//     delete_document) that the agent can call autonomously.
 //
 //  2. Auto-query: When enabled, all queries are automatically augmented with
-//     relevant context from the knowledge base before being sent to the LLM.
-//     This is invisible to the workflow and requires no tool calls.
+//     relevant context from the knowledge base before being sent to the agent.
+//     This requires no tool calls.
 //
 // The two modes can be used independently or together. With NoTools, the
 // agent functions purely as an auto-query wrapper. With SearchOnly and
-// AutoQuery disabled, the LLM must explicitly call search_knowledge.
+// AutoQuery disabled, the agent must explicitly call search_knowledge.
 //
 // # Tool Exposure Levels
 //
-//   - NoTools: No RAG tools exposed. Useful with AutoQuery enabled for
-//     transparent context injection without LLM awareness.
-//   - SearchOnly: Exposes search_knowledge tool. The LLM can query the KB
-//     but cannot modify it. Suitable for read-only knowledge bases.
-//   - FullCRUD: Exposes all RAG tools. The LLM can search, index, and
-//     delete documents. Useful for dynamic knowledge bases.
-//
-// # Knowledge Base vs Vector Store
-//
-// A [core.KnowledgeBase] manages the full RAG pipeline: document chunking,
-// embedding generation, and semantic search. It internally uses a
-// [core.VectorStore] for raw vector operations. The [OpenAIKnowledgeBase]
-// implementation uses OpenAI's embedding API and is pluggable with any
-// VectorStore implementation.
+//   - NoTools: No RAG tools exposed.
+//   - SearchOnly: Exposes search_knowledge tool. The agent can query the KB
+//     but cannot modify it.
+//   - FullCRUD: Exposes all RAG tools. The agent can search, index, and
+//     delete documents.
 package rag
 
 import (
@@ -67,16 +61,16 @@ const (
 )
 
 type RAGAgentConfig struct {
+	// ToolExposure determines which RAG tools (if any) are exposed to the underlying agent.
 	ToolExposure ToolExposure `json:"tool_exposure"`
-	AutoQuery    bool         `json:"auto_query"`
-	TopK         int          `json:"top_k"`
+
+	// AutoQuery controls whether context is automatically injected into queries.
+	AutoQuery bool `json:"auto_query"`
+
+	// TopK specifies how many relevant chunks to retrieve for auto-query.
+	TopK int `json:"top_k"`
 }
 
-// RAGAgent is a decorator that wraps any core.Agent with retrieval-augmented
-// generation capabilities.
-//
-// Workflows interact with RAGAgent through the core.Agent interface and are
-// unaware of RAG capabilities. Whether an agent has RAG is a wiring decision.
 type RAGAgent struct {
 	inner       core.Agent
 	kb          core.KnowledgeBase
@@ -84,8 +78,6 @@ type RAGAgent struct {
 	userHandler core.ToolHandlerFn
 }
 
-// NewRAGAgent wraps the given agent with RAG capabilities.
-// Parameters are passed as strings for compatibility with the wiring system.
 func NewRAGAgent(ctx context.Context, agent core.Agent, kb core.KnowledgeBase, toolExposure string, autoQuery string, topK string) (*RAGAgent, error) {
 	toolExposureValue, err := strconv.Atoi(toolExposure)
 	if err != nil {
@@ -122,9 +114,6 @@ func NewRAGAgent(ctx context.Context, agent core.Agent, kb core.KnowledgeBase, t
 	return r, nil
 }
 
-// AddSystemPrompt appends RAG-specific instructions to the user's prompt and
-// forwards it to the inner agent. The instructions vary based on tool exposure
-// and auto-query configuration.
 func (r *RAGAgent) AddSystemPrompt(ctx context.Context, prompt string) error {
 	parts := []string{
 		prompt,
@@ -155,8 +144,6 @@ func (r *RAGAgent) AddTools(ctx context.Context, tooldefs map[string]openai.Chat
 	return r.inner.AddTools(ctx, tooldefs)
 }
 
-// If AutoQuery is enabled, the query is augmented with relevant knowledge
-// base context before being sent to the LLM. Otherwise, the query is sent as-is.
 func (r *RAGAgent) LLMCall(ctx context.Context, query string) (string, error) {
 	preparedQuery, err := r.prepareQuery(ctx, query)
 	if err != nil {
@@ -170,8 +157,6 @@ func (r *RAGAgent) LLMCall(ctx context.Context, query string) (string, error) {
 	return response, nil
 }
 
-// If AutoQuery is enabled, the query is augmented with relevant knowledge
-// base context before being sent to the LLM. Otherwise, the query is sent as-is.
 func (r *RAGAgent) LLMCallWithTools(ctx context.Context, query string) (string, error) {
 	preparedQuery, err := r.prepareQuery(ctx, query)
 	if err != nil {
@@ -185,8 +170,6 @@ func (r *RAGAgent) LLMCallWithTools(ctx context.Context, query string) (string, 
 	return response, nil
 }
 
-// RegisterToolCallHandler handles RAG tool calls and delegates everything else
-// to the user's handler.
 func (r *RAGAgent) RegisterToolCallHandler(ctx context.Context, toolHandlerFn core.ToolHandlerFn) error {
 	r.userHandler = toolHandlerFn
 	if r.config.ToolExposure == NoTools {
@@ -195,8 +178,6 @@ func (r *RAGAgent) RegisterToolCallHandler(ctx context.Context, toolHandlerFn co
 	return r.inner.RegisterToolCallHandler(ctx, r.buildCompositeHandler())
 }
 
-// prepareQuery enriches the query with knowledge base context when AutoQuery
-// is enabled.
 func (r *RAGAgent) prepareQuery(ctx context.Context, query string) (string, error) {
 	if !r.config.AutoQuery {
 		return query, nil
