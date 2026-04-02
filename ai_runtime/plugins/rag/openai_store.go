@@ -25,10 +25,11 @@ type OpenAIKnowledgeBase struct {
 	docChunks map[string][]string
 }
 
-// The embeddingModel should be an OpenAI embedding model name (e.g.,
-// "text-embedding-3-small").
-func NewOpenAIKnowledgeBase(ctx context.Context, openaiURL string, apiKey string, embeddingModel string, vectorStore core.VectorStore) (*OpenAIKnowledgeBase, error) {
-	client := openai.NewClient(option.WithBaseURL(openaiURL), option.WithAPIKey(apiKey))
+// baseURL accepts any OpenAI API-compatible endpoint (e.g., OpenAI, local
+// models, etc.). apiKey and embeddingModel must be compatible with the API
+// specs.
+func NewOpenAIKnowledgeBase(ctx context.Context, baseURL string, apiKey string, embeddingModel string, vectorStore core.VectorStore) (*OpenAIKnowledgeBase, error) {
+	client := openai.NewClient(option.WithBaseURL(baseURL), option.WithAPIKey(apiKey))
 	return &OpenAIKnowledgeBase{
 		client:      &client,
 		model:       embeddingModel,

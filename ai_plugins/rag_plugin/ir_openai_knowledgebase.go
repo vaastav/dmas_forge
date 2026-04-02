@@ -21,13 +21,13 @@ type OpenAIKnowledgeBaseClient struct {
 
 	Spec           *workflowspec.Service
 	ClientName     string
-	OpenAIURL      string
+	BaseURL        string
 	APIKey         string
 	EmbeddingModel string
 	VectorStore    ir.IRNode
 }
 
-func newOpenAIKnowledgeBaseClient(name string, openaiURL string, apiKey string, embeddingModel string, vectorStore ir.IRNode) (*OpenAIKnowledgeBaseClient, error) {
+func newOpenAIKnowledgeBaseClient(name string, baseURL string, apiKey string, embeddingModel string, vectorStore ir.IRNode) (*OpenAIKnowledgeBaseClient, error) {
 	spec, err := workflowspec.GetService[ragruntime.OpenAIKnowledgeBase]()
 	if err != nil {
 		return nil, err
@@ -35,7 +35,7 @@ func newOpenAIKnowledgeBaseClient(name string, openaiURL string, apiKey string, 
 	return &OpenAIKnowledgeBaseClient{
 		Spec:           spec,
 		ClientName:     name,
-		OpenAIURL:      openaiURL,
+		BaseURL:        baseURL,
 		APIKey:         apiKey,
 		EmbeddingModel: embeddingModel,
 		VectorStore:    vectorStore,
@@ -59,7 +59,7 @@ func (node *OpenAIKnowledgeBaseClient) AddInstantiation(builder golang.Namespace
 
 	constructor := node.Spec.Constructor.AsConstructor()
 	return builder.DeclareConstructor(node.ClientName, constructor, []ir.IRNode{
-		&ir.IRValue{Value: node.OpenAIURL},
+		&ir.IRValue{Value: node.BaseURL},
 		&ir.IRValue{Value: node.APIKey},
 		&ir.IRValue{Value: node.EmbeddingModel},
 		node.VectorStore,

@@ -71,7 +71,7 @@ func VectorStore[Impl core.VectorStore](spec wiring.WiringSpec, name string) str
 // OpenAIKnowledgeBase creates a Blueprint service node for an OpenAI-backed
 // knowledge base. vectorStoreName must refer to a previously created
 // VectorStore service.
-func OpenAIKnowledgeBase(spec wiring.WiringSpec, name string, openaiURL string, apiKey string, embeddingModel string, vectorStoreName string) string {
+func OpenAIKnowledgeBase(spec wiring.WiringSpec, name string, baseURL string, apiKey string, embeddingModel string, vectorStoreName string) string {
 	backendName := name + ".openai_knowledge_base"
 
 	spec.Define(backendName, &OpenAIKnowledgeBaseClient{}, func(ns wiring.Namespace) (ir.IRNode, error) {
@@ -79,7 +79,7 @@ func OpenAIKnowledgeBase(spec wiring.WiringSpec, name string, openaiURL string, 
 		if err := ns.Get(vectorStoreName, &vectorStore); err != nil {
 			return nil, err
 		}
-		return newOpenAIKnowledgeBaseClient(name, openaiURL, apiKey, embeddingModel, vectorStore)
+		return newOpenAIKnowledgeBaseClient(name, baseURL, apiKey, embeddingModel, vectorStore)
 	})
 
 	pointer.CreatePointer[*OpenAIKnowledgeBaseClient](spec, name, backendName)
