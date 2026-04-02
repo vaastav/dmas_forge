@@ -20,8 +20,8 @@ rag_plugin.VectorStore[vectorstore.InMemoryVectorStore](spec, "my_vector_store")
 rag_plugin.OpenAIKnowledgeBase(spec, "my_kb", "https://api.openai.com", "api-key", "text-embedding-3-small", "my_vector_store")
 
 // Create a RAG-enabled agent
-rag_plugin.RAGAgent(spec, "my_agent", "base_agent", "my_kb", rag_plugin.RAGAgentConfig{
-    ToolExposure: rag_plugin.SearchOnly,
+rag_plugin.RAGAgent(spec, "my_agent", "base_agent", "my_kb", rag.RAGAgentConfig{
+    ToolExposure: rag.SearchOnly,
     AutoQuery:    true,
     TopK:         5,
 })
@@ -46,10 +46,9 @@ The implementation types \(MyCustomKB, MyCustomVS\) must satisfy their respectiv
 
 ## Index
 
-- [Constants](<#constants>)
 - [func KnowledgeBase\[Impl core.KnowledgeBase\]\(spec wiring.WiringSpec, name string\) string](<#KnowledgeBase>)
 - [func OpenAIKnowledgeBase\(spec wiring.WiringSpec, name string, openaiURL string, apiKey string, embeddingModel string, vectorStoreName string\) string](<#OpenAIKnowledgeBase>)
-- [func RAGAgent\(spec wiring.WiringSpec, name string, baseAgent string, kb string, config RAGAgentConfig\) string](<#RAGAgent>)
+- [func RAGAgent\(spec wiring.WiringSpec, name string, baseAgent string, kb string, config ragruntime.RAGAgentConfig\) string](<#RAGAgent>)
 - [func VectorStore\[Impl core.VectorStore\]\(spec wiring.WiringSpec, name string\) string](<#VectorStore>)
 - [type KnowledgeBaseClient](<#KnowledgeBaseClient>)
   - [func \(node \*KnowledgeBaseClient\) AddInstantiation\(builder golang.NamespaceBuilder\) error](<#KnowledgeBaseClient.AddInstantiation>)
@@ -75,8 +74,6 @@ The implementation types \(MyCustomKB, MyCustomVS\) must satisfy their respectiv
   - [func \(node \*RAGAgentClient\) ImplementsGolangNode\(\)](<#RAGAgentClient.ImplementsGolangNode>)
   - [func \(node \*RAGAgentClient\) Name\(\) string](<#RAGAgentClient.Name>)
   - [func \(node \*RAGAgentClient\) String\(\) string](<#RAGAgentClient.String>)
-- [type RAGAgentConfig](<#RAGAgentConfig>)
-- [type ToolExposure](<#ToolExposure>)
 - [type VectorStoreClient](<#VectorStoreClient>)
   - [func \(node \*VectorStoreClient\) AddInstantiation\(builder golang.NamespaceBuilder\) error](<#VectorStoreClient.AddInstantiation>)
   - [func \(node \*VectorStoreClient\) AddInterfaces\(builder golang.ModuleBuilder\) error](<#VectorStoreClient.AddInterfaces>)
@@ -87,20 +84,8 @@ The implementation types \(MyCustomKB, MyCustomVS\) must satisfy their respectiv
   - [func \(node \*VectorStoreClient\) String\(\) string](<#VectorStoreClient.String>)
 
 
-## Constants
-
-<a name="NoTools"></a>
-
-```go
-const (
-    NoTools    = ragruntime.NoTools
-    SearchOnly = ragruntime.SearchOnly
-    FullCRUD   = ragruntime.FullCRUD
-)
-```
-
 <a name="KnowledgeBase"></a>
-## func [KnowledgeBase](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L57>)
+## func [KnowledgeBase](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L47>)
 
 ```go
 func KnowledgeBase[Impl core.KnowledgeBase](spec wiring.WiringSpec, name string) string
@@ -109,7 +94,7 @@ func KnowledgeBase[Impl core.KnowledgeBase](spec wiring.WiringSpec, name string)
 KnowledgeBase creates a Blueprint service node for a custom KnowledgeBase implementation.
 
 <a name="OpenAIKnowledgeBase"></a>
-## func [OpenAIKnowledgeBase](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L84>)
+## func [OpenAIKnowledgeBase](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L74>)
 
 ```go
 func OpenAIKnowledgeBase(spec wiring.WiringSpec, name string, openaiURL string, apiKey string, embeddingModel string, vectorStoreName string) string
@@ -118,16 +103,16 @@ func OpenAIKnowledgeBase(spec wiring.WiringSpec, name string, openaiURL string, 
 OpenAIKnowledgeBase creates a Blueprint service node for an OpenAI\-backed knowledge base. vectorStoreName must refer to a previously created VectorStore service.
 
 <a name="RAGAgent"></a>
-## func [RAGAgent](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L102>)
+## func [RAGAgent](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L92>)
 
 ```go
-func RAGAgent(spec wiring.WiringSpec, name string, baseAgent string, kb string, config RAGAgentConfig) string
+func RAGAgent(spec wiring.WiringSpec, name string, baseAgent string, kb string, config ragruntime.RAGAgentConfig) string
 ```
 
 RAGAgent creates a Blueprint service node that wraps an existing agent with RAG capabilities. baseAgent and kb must refer to previously created core.Agent and KnowledgeBase services, respectively.
 
 <a name="VectorStore"></a>
-## func [VectorStore](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L70>)
+## func [VectorStore](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L60>)
 
 ```go
 func VectorStore[Impl core.VectorStore](spec wiring.WiringSpec, name string) string
@@ -312,7 +297,7 @@ type RAGAgentClient struct {
     ClientName    string
     InnerAgent    ir.IRNode
     KnowledgeBase ir.IRNode
-    ToolExposure  ToolExposure
+    ToolExposure  ragruntime.ToolExposure
     AutoQuery     bool
     TopK          int
 }
@@ -380,24 +365,6 @@ func (node *RAGAgentClient) String() string
 ```
 
 
-
-<a name="RAGAgentConfig"></a>
-## type [RAGAgentConfig](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L53>)
-
-
-
-```go
-type RAGAgentConfig = ragruntime.RAGAgentConfig
-```
-
-<a name="ToolExposure"></a>
-## type [ToolExposure](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L45>)
-
-
-
-```go
-type ToolExposure = ragruntime.ToolExposure
-```
 
 <a name="VectorStoreClient"></a>
 ## type [VectorStoreClient](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_vectorstore.go#L15-L22>)

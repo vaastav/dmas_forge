@@ -23,12 +23,12 @@ type RAGAgentClient struct {
 	ClientName    string
 	InnerAgent    ir.IRNode
 	KnowledgeBase ir.IRNode
-	ToolExposure  ToolExposure
+	ToolExposure  ragruntime.ToolExposure
 	AutoQuery     bool
 	TopK          int
 }
 
-func newRAGAgentClient(name string, innerAgent ir.IRNode, knowledgeBase ir.IRNode, toolExposure ToolExposure, autoQuery bool, topK int) (*RAGAgentClient, error) {
+func newRAGAgentClient(name string, innerAgent ir.IRNode, knowledgeBase ir.IRNode, toolExposure ragruntime.ToolExposure, autoQuery bool, topK int) (*RAGAgentClient, error) {
 	spec, err := workflowspec.GetService[ragruntime.RAGAgent]()
 	if err != nil {
 		return nil, err

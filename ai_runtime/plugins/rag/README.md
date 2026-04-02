@@ -14,8 +14,8 @@ Package rag provides retrieval\-augmented generation capabilities for agents.
 my_vector_store := rag_plugin.VectorStore[*vectorstore.InMemoryVectorStore](spec, "my_vector_store")
 my_kb := rag_plugin.OpenAIKnowledgeBase(spec, "my_kb", "https://api.openai.com", "api-key", "text-embedding-3-small", "my_vector_store")
 existing_agent := openai_plugin.OpenAILLMAgent(spec, "existing_agent", "https://api.openai.com", "api-key", "gpt-5.4-nano", openai_plugin.AgentConfig{})
-my_agent := rag_plugin.RAGAgent(spec, "my_agent", "existing_agent", "my_kb", rag_plugin.RAGAgentConfig{
-    ToolExposure: rag_plugin.SearchOnly,
+my_agent := rag_plugin.RAGAgent(spec, "my_agent", "existing_agent", "my_kb", rag.RAGAgentConfig{
+    ToolExposure: rag.SearchOnly,
     AutoQuery:    true,
     TopK:         5,
 })

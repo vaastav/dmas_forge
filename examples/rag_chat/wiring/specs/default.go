@@ -16,6 +16,7 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/openai_plugin"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/rag_plugin"
+	ragruntime "github.com/vaastav/agentic_blueprint/ai_runtime/plugins/rag"
 	"github.com/vaastav/agentic_blueprint/ai_runtime/plugins/vectorstore"
 	wf "github.com/vaastav/agentic_blueprint/examples/rag_chat/workflow"
 )
@@ -48,8 +49,8 @@ func makeAutomaticSpec(spec wiring.WiringSpec) ([]string, error) {
 	}
 
 	baseAgent, kb := defineRAGStack(spec, model)
-	agent := rag_plugin.RAGAgent(spec, "agent", baseAgent, kb, rag_plugin.RAGAgentConfig{
-		ToolExposure: rag_plugin.NoTools,
+	agent := rag_plugin.RAGAgent(spec, "agent", baseAgent, kb, ragruntime.RAGAgentConfig{
+		ToolExposure: ragruntime.NoTools,
 		AutoQuery:    true,
 		TopK:         3,
 	})
@@ -65,8 +66,8 @@ func makeAgenticSpec(spec wiring.WiringSpec) ([]string, error) {
 	}
 
 	baseAgent, kb := defineRAGStack(spec, model)
-	agent := rag_plugin.RAGAgent(spec, "agent", baseAgent, kb, rag_plugin.RAGAgentConfig{
-		ToolExposure: rag_plugin.FullCRUD,
+	agent := rag_plugin.RAGAgent(spec, "agent", baseAgent, kb, ragruntime.RAGAgentConfig{
+		ToolExposure: ragruntime.FullCRUD,
 		AutoQuery:    false,
 		TopK:         3,
 	})

@@ -12,8 +12,8 @@
 //	rag_plugin.OpenAIKnowledgeBase(spec, "my_kb", "https://api.openai.com", "api-key", "text-embedding-3-small", "my_vector_store")
 //
 //	// Create a RAG-enabled agent
-//	rag_plugin.RAGAgent(spec, "my_agent", "base_agent", "my_kb", rag_plugin.RAGAgentConfig{
-//	    ToolExposure: rag_plugin.SearchOnly,
+//	rag_plugin.RAGAgent(spec, "my_agent", "base_agent", "my_kb", rag.RAGAgentConfig{
+//	    ToolExposure: rag.SearchOnly,
 //	    AutoQuery:    true,
 //	    TopK:         5,
 //	})
@@ -41,16 +41,6 @@ import (
 	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
 	ragruntime "github.com/vaastav/agentic_blueprint/ai_runtime/plugins/rag"
 )
-
-type ToolExposure = ragruntime.ToolExposure
-
-const (
-	NoTools    = ragruntime.NoTools
-	SearchOnly = ragruntime.SearchOnly
-	FullCRUD   = ragruntime.FullCRUD
-)
-
-type RAGAgentConfig = ragruntime.RAGAgentConfig
 
 // KnowledgeBase creates a Blueprint service node for a custom KnowledgeBase
 // implementation.
@@ -99,7 +89,7 @@ func OpenAIKnowledgeBase(spec wiring.WiringSpec, name string, openaiURL string, 
 // RAGAgent creates a Blueprint service node that wraps an existing agent with
 // RAG capabilities. baseAgent and kb must refer to previously created
 // core.Agent and KnowledgeBase services, respectively.
-func RAGAgent(spec wiring.WiringSpec, name string, baseAgent string, kb string, config RAGAgentConfig) string {
+func RAGAgent(spec wiring.WiringSpec, name string, baseAgent string, kb string, config ragruntime.RAGAgentConfig) string {
 	backendName := name + ".rag_agent"
 
 	spec.Define(backendName, &RAGAgentClient{}, func(ns wiring.Namespace) (ir.IRNode, error) {
