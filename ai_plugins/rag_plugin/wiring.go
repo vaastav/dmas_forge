@@ -101,7 +101,7 @@ func RAGAgent(spec wiring.WiringSpec, name string, baseAgent string, kb string, 
 		if err := ns.Get(kb, &knowledgeBase); err != nil {
 			return nil, err
 		}
-		return newRAGAgentClient(name, innerAgent, knowledgeBase, config.ToolExposure, config.AutoQuery, config.TopK)
+		return newRAGAgentClient(name, innerAgent, knowledgeBase, config)
 	})
 
 	pointer.CreatePointer[*RAGAgentClient](spec, name, backendName)

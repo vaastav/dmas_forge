@@ -23,12 +23,10 @@ type RAGAgentClient struct {
 	ClientName    string
 	InnerAgent    ir.IRNode
 	KnowledgeBase ir.IRNode
-	ToolExposure  ragruntime.ToolExposure
-	AutoQuery     bool
-	TopK          int
+	Config        ragruntime.RAGAgentConfig
 }
 
-func newRAGAgentClient(name string, innerAgent ir.IRNode, knowledgeBase ir.IRNode, toolExposure ragruntime.ToolExposure, autoQuery bool, topK int) (*RAGAgentClient, error) {
+func newRAGAgentClient(name string, innerAgent ir.IRNode, knowledgeBase ir.IRNode, config ragruntime.RAGAgentConfig) (*RAGAgentClient, error) {
 	spec, err := workflowspec.GetService[ragruntime.RAGAgent]()
 	if err != nil {
 		return nil, err
@@ -38,9 +36,7 @@ func newRAGAgentClient(name string, innerAgent ir.IRNode, knowledgeBase ir.IRNod
 		ClientName:    name,
 		InnerAgent:    innerAgent,
 		KnowledgeBase: knowledgeBase,
-		ToolExposure:  toolExposure,
-		AutoQuery:     autoQuery,
-		TopK:          topK,
+		Config:        config,
 	}, nil
 }
 
@@ -63,9 +59,9 @@ func (node *RAGAgentClient) AddInstantiation(builder golang.NamespaceBuilder) er
 	return builder.DeclareConstructor(node.ClientName, constructor, []ir.IRNode{
 		node.InnerAgent,
 		node.KnowledgeBase,
-		&ir.IRValue{Value: strconv.Itoa(int(node.ToolExposure))},
-		&ir.IRValue{Value: strconv.FormatBool(node.AutoQuery)},
-		&ir.IRValue{Value: strconv.Itoa(node.TopK)},
+		&ir.IRValue{Value: strconv.Itoa(int(node.Config.ToolExposure))},
+		&ir.IRValue{Value: strconv.FormatBool(node.Config.AutoQuery)},
+		&ir.IRValue{Value: strconv.Itoa(node.Config.TopK)},
 	})
 }
 
