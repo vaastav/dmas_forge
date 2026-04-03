@@ -42,7 +42,7 @@ The two modes can be used independently or together. With NoTools, the agent fun
 ## Index
 
 - [type OpenAIKnowledgeBase](<#OpenAIKnowledgeBase>)
-  - [func NewOpenAIKnowledgeBase\(ctx context.Context, openaiURL string, apiKey string, embeddingModel string, vectorStore core.VectorStore\) \(\*OpenAIKnowledgeBase, error\)](<#NewOpenAIKnowledgeBase>)
+  - [func NewOpenAIKnowledgeBase\(ctx context.Context, baseURL string, apiKey string, embeddingModel string, vectorStore core.VectorStore\) \(\*OpenAIKnowledgeBase, error\)](<#NewOpenAIKnowledgeBase>)
   - [func \(kb \*OpenAIKnowledgeBase\) Delete\(ctx context.Context, docID string\) error](<#OpenAIKnowledgeBase.Delete>)
   - [func \(kb \*OpenAIKnowledgeBase\) Index\(ctx context.Context, doc core.Document\) error](<#OpenAIKnowledgeBase.Index>)
   - [func \(kb \*OpenAIKnowledgeBase\) Query\(ctx context.Context, query string, topK int\) \(\[\]core.Chunk, error\)](<#OpenAIKnowledgeBase.Query>)
@@ -69,16 +69,16 @@ type OpenAIKnowledgeBase struct {
 ```
 
 <a name="NewOpenAIKnowledgeBase"></a>
-### func [NewOpenAIKnowledgeBase](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L30>)
+### func [NewOpenAIKnowledgeBase](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L31>)
 
 ```go
-func NewOpenAIKnowledgeBase(ctx context.Context, openaiURL string, apiKey string, embeddingModel string, vectorStore core.VectorStore) (*OpenAIKnowledgeBase, error)
+func NewOpenAIKnowledgeBase(ctx context.Context, baseURL string, apiKey string, embeddingModel string, vectorStore core.VectorStore) (*OpenAIKnowledgeBase, error)
 ```
 
-The embeddingModel should be an OpenAI embedding model name \(e.g., "text\-embedding\-3\-small"\).
+baseURL accepts any OpenAI API\-compatible endpoint \(e.g., OpenAI, local models, etc.\). apiKey and embeddingModel must be compatible with the API specs.
 
 <a name="OpenAIKnowledgeBase.Delete"></a>
-### func \(\*OpenAIKnowledgeBase\) [Delete](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L136>)
+### func \(\*OpenAIKnowledgeBase\) [Delete](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L137>)
 
 ```go
 func (kb *OpenAIKnowledgeBase) Delete(ctx context.Context, docID string) error
@@ -87,7 +87,7 @@ func (kb *OpenAIKnowledgeBase) Delete(ctx context.Context, docID string) error
 
 
 <a name="OpenAIKnowledgeBase.Index"></a>
-### func \(\*OpenAIKnowledgeBase\) [Index](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L40>)
+### func \(\*OpenAIKnowledgeBase\) [Index](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L41>)
 
 ```go
 func (kb *OpenAIKnowledgeBase) Index(ctx context.Context, doc core.Document) error
@@ -96,7 +96,7 @@ func (kb *OpenAIKnowledgeBase) Index(ctx context.Context, doc core.Document) err
 
 
 <a name="OpenAIKnowledgeBase.Query"></a>
-### func \(\*OpenAIKnowledgeBase\) [Query](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L95>)
+### func \(\*OpenAIKnowledgeBase\) [Query](<https://github.com/vaastav/dmas_forge/blob/main/ai_runtime/plugins/rag/openai_store.go#L96>)
 
 ```go
 func (kb *OpenAIKnowledgeBase) Query(ctx context.Context, query string, topK int) ([]core.Chunk, error)

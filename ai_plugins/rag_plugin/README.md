@@ -20,8 +20,8 @@ rag_plugin.VectorStore[vectorstore.InMemoryVectorStore](spec, "my_vector_store")
 rag_plugin.OpenAIKnowledgeBase(spec, "my_kb", "https://api.openai.com", "api-key", "text-embedding-3-small", "my_vector_store")
 
 // Create a RAG-enabled agent
-rag_plugin.RAGAgent(spec, "my_agent", "base_agent", "my_kb", rag.RAGAgentConfig{
-    ToolExposure: rag.SearchOnly,
+rag_plugin.RAGAgent(spec, "my_agent", "base_agent", "my_kb", rag_plugin.RAGAgentConfig{
+    ToolExposure: rag_plugin.SearchOnly,
     AutoQuery:    true,
     TopK:         5,
 })
@@ -47,7 +47,7 @@ The implementation types \(MyCustomKB, MyCustomVS\) must satisfy their respectiv
 ## Index
 
 - [func KnowledgeBase\[Impl core.KnowledgeBase\]\(spec wiring.WiringSpec, name string\) string](<#KnowledgeBase>)
-- [func OpenAIKnowledgeBase\(spec wiring.WiringSpec, name string, openaiURL string, apiKey string, embeddingModel string, vectorStoreName string\) string](<#OpenAIKnowledgeBase>)
+- [func OpenAIKnowledgeBase\(spec wiring.WiringSpec, name string, baseURL string, apiKey string, embeddingModel string, vectorStoreName string\) string](<#OpenAIKnowledgeBase>)
 - [func RAGAgent\(spec wiring.WiringSpec, name string, baseAgent string, kb string, config ragruntime.RAGAgentConfig\) string](<#RAGAgent>)
 - [func VectorStore\[Impl core.VectorStore\]\(spec wiring.WiringSpec, name string\) string](<#VectorStore>)
 - [type KnowledgeBaseClient](<#KnowledgeBaseClient>)
@@ -97,7 +97,7 @@ KnowledgeBase creates a Blueprint service node for a custom KnowledgeBase implem
 ## func [OpenAIKnowledgeBase](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/wiring.go#L74>)
 
 ```go
-func OpenAIKnowledgeBase(spec wiring.WiringSpec, name string, openaiURL string, apiKey string, embeddingModel string, vectorStoreName string) string
+func OpenAIKnowledgeBase(spec wiring.WiringSpec, name string, baseURL string, apiKey string, embeddingModel string, vectorStoreName string) string
 ```
 
 OpenAIKnowledgeBase creates a Blueprint service node for an OpenAI\-backed knowledge base. vectorStoreName must refer to a previously created VectorStore service.
@@ -212,7 +212,7 @@ type OpenAIKnowledgeBaseClient struct {
 
     Spec           *workflowspec.Service
     ClientName     string
-    OpenAIURL      string
+    BaseURL        string
     APIKey         string
     EmbeddingModel string
     VectorStore    ir.IRNode
@@ -283,7 +283,7 @@ func (node *OpenAIKnowledgeBaseClient) String() string
 
 
 <a name="RAGAgentClient"></a>
-## type [RAGAgentClient](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L17-L29>)
+## type [RAGAgentClient](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L17-L27>)
 
 RAGAgentClient is the Blueprint IR node for a RAG\-enabled agent. It adds RAG capabilities to a core.Agent.
 
@@ -297,14 +297,12 @@ type RAGAgentClient struct {
     ClientName    string
     InnerAgent    ir.IRNode
     KnowledgeBase ir.IRNode
-    ToolExposure  ragruntime.ToolExposure
-    AutoQuery     bool
-    TopK          int
+    Config        ragruntime.RAGAgentConfig
 }
 ```
 
 <a name="RAGAgentClient.AddInstantiation"></a>
-### func \(\*RAGAgentClient\) [AddInstantiation](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L55>)
+### func \(\*RAGAgentClient\) [AddInstantiation](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L51>)
 
 ```go
 func (node *RAGAgentClient) AddInstantiation(builder golang.NamespaceBuilder) error
@@ -313,7 +311,7 @@ func (node *RAGAgentClient) AddInstantiation(builder golang.NamespaceBuilder) er
 
 
 <a name="RAGAgentClient.AddInterfaces"></a>
-### func \(\*RAGAgentClient\) [AddInterfaces](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L76>)
+### func \(\*RAGAgentClient\) [AddInterfaces](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L72>)
 
 ```go
 func (node *RAGAgentClient) AddInterfaces(builder golang.ModuleBuilder) error
@@ -322,7 +320,7 @@ func (node *RAGAgentClient) AddInterfaces(builder golang.ModuleBuilder) error
 
 
 <a name="RAGAgentClient.AddToWorkspace"></a>
-### func \(\*RAGAgentClient\) [AddToWorkspace](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L72>)
+### func \(\*RAGAgentClient\) [AddToWorkspace](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L68>)
 
 ```go
 func (node *RAGAgentClient) AddToWorkspace(builder golang.WorkspaceBuilder) error
@@ -331,7 +329,7 @@ func (node *RAGAgentClient) AddToWorkspace(builder golang.WorkspaceBuilder) erro
 
 
 <a name="RAGAgentClient.GetInterface"></a>
-### func \(\*RAGAgentClient\) [GetInterface](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L80>)
+### func \(\*RAGAgentClient\) [GetInterface](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L76>)
 
 ```go
 func (node *RAGAgentClient) GetInterface(ctx ir.BuildContext) (service.ServiceInterface, error)
@@ -340,7 +338,7 @@ func (node *RAGAgentClient) GetInterface(ctx ir.BuildContext) (service.ServiceIn
 
 
 <a name="RAGAgentClient.ImplementsGolangNode"></a>
-### func \(\*RAGAgentClient\) [ImplementsGolangNode](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L84>)
+### func \(\*RAGAgentClient\) [ImplementsGolangNode](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L80>)
 
 ```go
 func (node *RAGAgentClient) ImplementsGolangNode()
@@ -349,7 +347,7 @@ func (node *RAGAgentClient) ImplementsGolangNode()
 
 
 <a name="RAGAgentClient.Name"></a>
-### func \(\*RAGAgentClient\) [Name](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L47>)
+### func \(\*RAGAgentClient\) [Name](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L43>)
 
 ```go
 func (node *RAGAgentClient) Name() string
@@ -358,7 +356,7 @@ func (node *RAGAgentClient) Name() string
 
 
 <a name="RAGAgentClient.String"></a>
-### func \(\*RAGAgentClient\) [String](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L51>)
+### func \(\*RAGAgentClient\) [String](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/rag_plugin/ir_rag_agent.go#L47>)
 
 ```go
 func (node *RAGAgentClient) String() string
