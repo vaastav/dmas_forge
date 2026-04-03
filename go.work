@@ -5,6 +5,8 @@ use (
 	./ai_runtime
 	./examples/chat/wiring
 	./examples/chat/workflow
+	./examples/rag_chat/wiring
+	./examples/rag_chat/workflow
 	./examples/weather/wiring
 	./examples/weather/workflow
 )
