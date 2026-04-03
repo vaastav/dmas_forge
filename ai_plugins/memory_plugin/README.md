@@ -31,7 +31,7 @@ Package memory\_plugin provides wiring functions for memory\-backed agents. Use 
 
 
 <a name="MemoryAgent"></a>
-## func [MemoryAgent](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/wiring.go#L41>)
+## func [MemoryAgent](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/wiring.go#L41>)
 
 ```go
 func MemoryAgent(spec wiring.WiringSpec, name string, agentName string, memoryName string) string
@@ -42,7 +42,7 @@ MemoryAgent wraps an existing agent with LLM\-driven memory capabilities. The ag
 agentName must reference an already\-defined agent in the spec. memoryName must reference an already\-defined memory store in the spec.
 
 <a name="MemoryStore"></a>
-## func [MemoryStore](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/wiring.go#L23>)
+## func [MemoryStore](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/wiring.go#L23>)
 
 ```go
 func MemoryStore[Impl core.Memory](spec wiring.WiringSpec, name string) string
@@ -61,7 +61,7 @@ memStore := memory_plugin.MemoryStore[*redis.RedisMemory](spec, "my_memory")
 ```
 
 <a name="MemoryAgentClient"></a>
-## type [MemoryAgentClient](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L74-L83>)
+## type [MemoryAgentClient](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L74-L83>)
 
 MemoryAgentClient is the IR node for a MemoryAgent decorator instance.
 
@@ -79,7 +79,7 @@ type MemoryAgentClient struct {
 ```
 
 <a name="MemoryAgentClient.AddInstantiation"></a>
-### func \(\*MemoryAgentClient\) [AddInstantiation](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L109>)
+### func \(\*MemoryAgentClient\) [AddInstantiation](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L109>)
 
 ```go
 func (node *MemoryAgentClient) AddInstantiation(builder golang.NamespaceBuilder) error
@@ -88,7 +88,7 @@ func (node *MemoryAgentClient) AddInstantiation(builder golang.NamespaceBuilder)
 Implements golang.Instantiable
 
 <a name="MemoryAgentClient.AddInterfaces"></a>
-### func \(\*MemoryAgentClient\) [AddInterfaces](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L126>)
+### func \(\*MemoryAgentClient\) [AddInterfaces](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L126>)
 
 ```go
 func (node *MemoryAgentClient) AddInterfaces(builder golang.ModuleBuilder) error
@@ -97,7 +97,7 @@ func (node *MemoryAgentClient) AddInterfaces(builder golang.ModuleBuilder) error
 Implements golang.ProvidesInterface
 
 <a name="MemoryAgentClient.AddToWorkspace"></a>
-### func \(\*MemoryAgentClient\) [AddToWorkspace](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L121>)
+### func \(\*MemoryAgentClient\) [AddToWorkspace](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L121>)
 
 ```go
 func (node *MemoryAgentClient) AddToWorkspace(builder golang.WorkspaceBuilder) error
@@ -106,7 +106,7 @@ func (node *MemoryAgentClient) AddToWorkspace(builder golang.WorkspaceBuilder) e
 Implements golang.ProvidesModule
 
 <a name="MemoryAgentClient.GetInterface"></a>
-### func \(\*MemoryAgentClient\) [GetInterface](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L131>)
+### func \(\*MemoryAgentClient\) [GetInterface](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L131>)
 
 ```go
 func (node *MemoryAgentClient) GetInterface(ctx ir.BuildContext) (service.ServiceInterface, error)
@@ -115,7 +115,7 @@ func (node *MemoryAgentClient) GetInterface(ctx ir.BuildContext) (service.Servic
 Implements service.ServiceNode
 
 <a name="MemoryAgentClient.ImplementsGolangNode"></a>
-### func \(\*MemoryAgentClient\) [ImplementsGolangNode](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L136>)
+### func \(\*MemoryAgentClient\) [ImplementsGolangNode](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L136>)
 
 ```go
 func (node *MemoryAgentClient) ImplementsGolangNode()
@@ -124,7 +124,7 @@ func (node *MemoryAgentClient) ImplementsGolangNode()
 Implements golang.Node
 
 <a name="MemoryAgentClient.Name"></a>
-### func \(\*MemoryAgentClient\) [Name](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L99>)
+### func \(\*MemoryAgentClient\) [Name](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L99>)
 
 ```go
 func (node *MemoryAgentClient) Name() string
@@ -133,7 +133,7 @@ func (node *MemoryAgentClient) Name() string
 Implements ir.IRNode
 
 <a name="MemoryAgentClient.String"></a>
-### func \(\*MemoryAgentClient\) [String](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L104>)
+### func \(\*MemoryAgentClient\) [String](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L104>)
 
 ```go
 func (node *MemoryAgentClient) String() string
@@ -142,7 +142,7 @@ func (node *MemoryAgentClient) String() string
 Implements ir.IRNode
 
 <a name="MemoryStoreClient"></a>
-## type [MemoryStoreClient](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L16-L23>)
+## type [MemoryStoreClient](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L16-L23>)
 
 MemoryStoreClient is the IR node for a memory store instance.
 
@@ -158,7 +158,7 @@ type MemoryStoreClient struct {
 ```
 
 <a name="MemoryStoreClient.AddInstantiation"></a>
-### func \(\*MemoryStoreClient\) [AddInstantiation](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L44>)
+### func \(\*MemoryStoreClient\) [AddInstantiation](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L44>)
 
 ```go
 func (node *MemoryStoreClient) AddInstantiation(builder golang.NamespaceBuilder) error
@@ -167,7 +167,7 @@ func (node *MemoryStoreClient) AddInstantiation(builder golang.NamespaceBuilder)
 Implements golang.Instantiable
 
 <a name="MemoryStoreClient.AddInterfaces"></a>
-### func \(\*MemoryStoreClient\) [AddInterfaces](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L61>)
+### func \(\*MemoryStoreClient\) [AddInterfaces](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L61>)
 
 ```go
 func (node *MemoryStoreClient) AddInterfaces(builder golang.ModuleBuilder) error
@@ -176,7 +176,7 @@ func (node *MemoryStoreClient) AddInterfaces(builder golang.ModuleBuilder) error
 Implements golang.ProvidesInterface
 
 <a name="MemoryStoreClient.AddToWorkspace"></a>
-### func \(\*MemoryStoreClient\) [AddToWorkspace](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L56>)
+### func \(\*MemoryStoreClient\) [AddToWorkspace](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L56>)
 
 ```go
 func (node *MemoryStoreClient) AddToWorkspace(builder golang.WorkspaceBuilder) error
@@ -185,7 +185,7 @@ func (node *MemoryStoreClient) AddToWorkspace(builder golang.WorkspaceBuilder) e
 Implements golang.ProvidesModule
 
 <a name="MemoryStoreClient.GetInterface"></a>
-### func \(\*MemoryStoreClient\) [GetInterface](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L66>)
+### func \(\*MemoryStoreClient\) [GetInterface](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L66>)
 
 ```go
 func (node *MemoryStoreClient) GetInterface(ctx ir.BuildContext) (service.ServiceInterface, error)
@@ -194,7 +194,7 @@ func (node *MemoryStoreClient) GetInterface(ctx ir.BuildContext) (service.Servic
 Implements service.ServiceNode
 
 <a name="MemoryStoreClient.ImplementsGolangNode"></a>
-### func \(\*MemoryStoreClient\) [ImplementsGolangNode](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L71>)
+### func \(\*MemoryStoreClient\) [ImplementsGolangNode](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L71>)
 
 ```go
 func (node *MemoryStoreClient) ImplementsGolangNode()
@@ -203,7 +203,7 @@ func (node *MemoryStoreClient) ImplementsGolangNode()
 Implements golang.Node
 
 <a name="MemoryStoreClient.Name"></a>
-### func \(\*MemoryStoreClient\) [Name](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L34>)
+### func \(\*MemoryStoreClient\) [Name](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L34>)
 
 ```go
 func (node *MemoryStoreClient) Name() string
@@ -212,7 +212,7 @@ func (node *MemoryStoreClient) Name() string
 Implements ir.IRNode
 
 <a name="MemoryStoreClient.String"></a>
-### func \(\*MemoryStoreClient\) [String](<https://github.com/Abdomash/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L39>)
+### func \(\*MemoryStoreClient\) [String](<https://github.com/vaastav/dmas_forge/blob/main/ai_plugins/memory_plugin/ir.go#L39>)
 
 ```go
 func (node *MemoryStoreClient) String() string
