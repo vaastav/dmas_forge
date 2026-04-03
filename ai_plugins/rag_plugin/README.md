@@ -20,8 +20,8 @@ rag_plugin.VectorStore[vectorstore.InMemoryVectorStore](spec, "my_vector_store")
 rag_plugin.OpenAIKnowledgeBase(spec, "my_kb", "https://api.openai.com", "api-key", "text-embedding-3-small", "my_vector_store")
 
 // Create a RAG-enabled agent
-rag_plugin.RAGAgent(spec, "my_agent", "base_agent", "my_kb", rag_plugin.RAGAgentConfig{
-    ToolExposure: rag_plugin.SearchOnly,
+rag_plugin.RAGAgent(spec, "my_agent", "base_agent", "my_kb", ragruntime.RAGAgentConfig{
+    ToolExposure: ragruntime.SearchOnly,
     AutoQuery:    true,
     TopK:         5,
 })
