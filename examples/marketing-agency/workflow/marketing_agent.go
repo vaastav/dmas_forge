@@ -60,5 +60,6 @@ func (a *MarketingAgentImpl) CreateStrategy(ctx context.Context, domain string, 
 		return payload.StrategyMarkdown, nil
 	}
 
+	// Fallback: return the raw response as-is.
 	return resp, nil
 }

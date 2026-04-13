@@ -63,64 +63,10 @@ func (a *WebsiteAgentImpl) GenerateWebsite(ctx context.Context, domain string, b
 	var payload struct {
 		Files map[string]string `json:"files"`
 	}
-	if unmarshalJSONFromLLMResponse(resp, &payload) && hasRequiredWebsiteFiles(payload.Files) {
+	if unmarshalJSONFromLLMResponse(resp, &payload) && len(payload.Files) > 0 {
 		return WebsiteContent{Files: payload.Files}, nil
 	}
 
-	return WebsiteContent{Files: parseWebsiteFilesFallback(resp)}, nil
-}
-
-func parseWebsiteFilesFallback(response string) map[string]string {
-	files := map[string]string{}
-	lines := strings.Split(response, "\n")
-	var current string
-	var b strings.Builder
-	inCode := false
-
-	flush := func() {
-		if current == "" {
-			return
-		}
-		files[current] = strings.TrimSpace(b.String()) + "\n"
-		b.Reset()
-	}
-
-	for _, line := range lines {
-		if strings.HasPrefix(line, "FILENAME:") {
-			flush()
-			current = strings.TrimSpace(strings.TrimPrefix(line, "FILENAME:"))
-			inCode = false
-			continue
-		}
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			inCode = !inCode
-			if !inCode {
-				flush()
-			}
-			continue
-		}
-		if inCode && current != "" {
-			b.WriteString(line)
-			b.WriteString("\n")
-		}
-	}
-	flush()
-
-	return files
-}
-
-func hasRequiredWebsiteFiles(files map[string]string) bool {
-	if len(files) == 0 {
-		return false
-	}
-
-	required := []string{"index.html", "about.html", "services.html", "contact.html", "style.css", "script.js"}
-	for _, name := range required {
-		content, ok := files[name]
-		if !ok || strings.TrimSpace(content) == "" {
-			return false
-		}
-	}
-
-	return true
+	// Fallback: wrap raw output as a single file.
+	return WebsiteContent{Files: map[string]string{"raw_output.txt": resp}}, nil
 }

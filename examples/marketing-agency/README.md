@@ -9,7 +9,7 @@ The coordinator orchestrates four specialized agents:
 - `DomainAgent`: suggests candidate domains using DuckDuckGo search.
 - `WebsiteAgent`: generates website files (`index.html`, `about.html`, `services.html`, `contact.html`, `style.css`, `script.js`).
 - `MarketingAgent`: generates a full marketing strategy document.
-- `LogoAgent`: generates and saves a logo image via OpenAI images API.
+- `LogoAgent`: generates a logo image via OpenAI images API and returns it inline as JPEG.
 
 ## Architecture
 
@@ -17,6 +17,19 @@ The coordinator orchestrates four specialized agents:
 - Wiring/deployment code: `examples/marketing-agency/wiring`
 
 The workflow layer is protocol-agnostic. Wiring layer handles deployment as HTTP service in Docker.
+
+# Differences from the ADK Reference Implementation
+
+Unlike the original, where sub-agents are tools inside a single process, this reimplementation wires each agent as a separate Go service within the same process.
+
+The original example returns raw text and does no parsing, but this version expects structured output and parses each agent's result with JSON deserialization first, falling back to code-block extraction, and ultimately returning the raw model output if neither works.
+
+Small models like GPT-5.4-nano may struggle with website generation because the output is large and can get truncated. A stronger model like GPT-5.4 is more reliable.
+
+# Limitations
+
+- The code is meant for demonstration and experimentation purposes and isn't production-ready.
+- As in the reference example, the coordinator calls agents in a fixed order, without dynamic delegation based on intermediate results.
 
 ## Setup
 
@@ -36,6 +49,7 @@ Edit `examples/marketing-agency/wiring/example_model.json`:
 cd examples/marketing-agency/wiring
 go run main.go -w docker -o build -modfile=./example_model.json
 cd build/docker
+cp ../.local.env .env
 docker compose build && docker compose up -d
 ```
 
@@ -57,44 +71,5 @@ Expected response contains a `Ret0` object with:
 - `selected_domain`
 - `website_files`
 - `marketing_strategy`
-- `logo_filepath`
+- `logo_jpeg` (base64-encoded JPEG image)
 - `summary`
-
-Generated images are written under `artifacts/` in the service working directory.
-
-Note: in this example, only the logo image is written to disk. Other campaign outputs
-(`domains`, `website_files`, `marketing_strategy`, `summary`) are returned in the HTTP
-response body and are not persisted by default.
-
-## To Persist Artifacts in Docker
-
-By default, `artifacts/` lives inside the container filesystem. To persist generated
-logo files across container recreation, mount `/artifacts` to either a host directory
-or a Docker named volume.
-
-After generating the Docker wiring (`go run main.go -w docker -o build ...`), edit:
-
-`examples/marketing-agency/wiring/build/docker/docker-compose.yml`
-
-with a host bind mount
-
-```yaml
-services:
-  coordinator_ctr:
-    # ... existing fields
-    volumes:
-      - ./artifacts:/artifacts
-```
-
-or a docker named volume
-
-```yaml
-services:
-  coordinator_ctr:
-    # ... existing fields
-    volumes:
-      - campaign_artifacts:/artifacts
-
-volumes:
-  campaign_artifacts:
-```

@@ -37,10 +37,6 @@ func makeDockerSpec(spec wiring.WiringSpec) ([]string, error) {
 		return []string{}, err
 	}
 
-	if err := os.MkdirAll("./artifacts", 0o755); err != nil {
-		return []string{}, err
-	}
-
 	domainAgentCore := openai_plugin.OpenAILLMAgent(
 		spec,
 		"domain_agent_core",
@@ -85,7 +81,7 @@ func makeDockerSpec(spec wiring.WiringSpec) ([]string, error) {
 	domainService := workflow.Service[wf.DomainAgent](spec, "domain_service", domainAgentCore)
 	websiteService := workflow.Service[wf.WebsiteAgent](spec, "website_service", websiteAgentCore)
 	marketingService := workflow.Service[wf.MarketingAgent](spec, "marketing_service", marketingAgentCore)
-	logoService := workflow.Service[wf.LogoAgent](spec, "logo_service", logoAgentCore, "./", model.Key, model.URL)
+	logoService := workflow.Service[wf.LogoAgent](spec, "logo_service", logoAgentCore, model.Key, model.URL)
 	coordinatorService := workflow.Service[wf.MarketingCoordinator](
 		spec,
 		"coordinator_service",

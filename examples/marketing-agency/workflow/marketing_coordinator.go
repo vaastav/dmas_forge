@@ -2,10 +2,10 @@ package workflow
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 
 	openai "github.com/openai/openai-go"
 	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
@@ -39,9 +39,9 @@ type MarketingCoordinatorImpl struct {
 	marketingSvc MarketingAgent
 	logoSvc      LogoAgent
 
-	mu      sync.Mutex
-	current CampaignRequest
-	result  CampaignResult
+	// Set per-call by CreateCampaign; read by tool handlers.
+	req    CampaignRequest
+	result *CampaignResult
 }
 
 func NewMarketingCoordinatorImpl(
@@ -66,8 +66,8 @@ func NewMarketingCoordinatorImpl(
 
 	if err := a.agent.AddTools(ctx, map[string]openai.ChatCompletionToolParam{
 		"suggest_domains":  domainToolSchema(),
-		"create_website":   websiteToolSchema(),
-		"create_marketing": marketingToolSchema(),
+		"create_website":   brandToolSchema("create_website", "Generate website files for the selected domain and brand."),
+		"create_marketing": brandToolSchema("create_marketing", "Create campaign marketing strategy."),
 		"generate_logo":    logoToolSchema(),
 	}); err != nil {
 		return nil, err
@@ -81,11 +81,8 @@ func NewMarketingCoordinatorImpl(
 }
 
 func (a *MarketingCoordinatorImpl) CreateCampaign(ctx context.Context, req CampaignRequest) (CampaignResult, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	a.current = req
-	a.result = CampaignResult{}
+	a.req = req
+	a.result = &CampaignResult{}
 
 	query := fmt.Sprintf(
 		"Create a complete marketing campaign.\\nBrand: %s\\nKeywords: %s\\nDescription: %s\\nTarget audience: %s\\n\\nYou must call tools in order: suggest_domains, create_website, create_marketing, generate_logo.",
@@ -101,8 +98,10 @@ func (a *MarketingCoordinatorImpl) CreateCampaign(ctx context.Context, req Campa
 	}
 
 	a.result.Summary = summary
-	return a.result, nil
+	return *a.result, nil
 }
+
+// --- tool dispatch ---
 
 func (a *MarketingCoordinatorImpl) compositeHandler() core.ToolHandlerFn {
 	return func(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
@@ -120,6 +119,8 @@ func (a *MarketingCoordinatorImpl) compositeHandler() core.ToolHandlerFn {
 		}
 	}
 }
+
+// --- tool schemas ---
 
 func domainToolSchema() openai.ChatCompletionToolParam {
 	return openai.ChatCompletionToolParam{
@@ -140,34 +141,12 @@ func domainToolSchema() openai.ChatCompletionToolParam {
 	}
 }
 
-func websiteToolSchema() openai.ChatCompletionToolParam {
+// brandToolSchema returns a shared schema used by create_website and create_marketing.
+func brandToolSchema(name, description string) openai.ChatCompletionToolParam {
 	return openai.ChatCompletionToolParam{
 		Function: openai.FunctionDefinitionParam{
-			Name:        "create_website",
-			Description: openai.String("Generate website files for the selected domain and brand."),
-			Parameters: openai.FunctionParameters{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"domain":          map[string]interface{}{"type": "string"},
-					"brand_name":      map[string]interface{}{"type": "string"},
-					"description":     map[string]interface{}{"type": "string"},
-					"target_audience": map[string]interface{}{"type": "string"},
-					"keywords": map[string]interface{}{
-						"type":  "array",
-						"items": map[string]interface{}{"type": "string"},
-					},
-				},
-				"required": []string{"domain", "brand_name"},
-			},
-		},
-	}
-}
-
-func marketingToolSchema() openai.ChatCompletionToolParam {
-	return openai.ChatCompletionToolParam{
-		Function: openai.FunctionDefinitionParam{
-			Name:        "create_marketing",
-			Description: openai.String("Create campaign marketing strategy."),
+			Name:        name,
+			Description: openai.String(description),
 			Parameters: openai.FunctionParameters{
 				"type": "object",
 				"properties": map[string]interface{}{
@@ -203,6 +182,45 @@ func logoToolSchema() openai.ChatCompletionToolParam {
 	}
 }
 
+// --- tool handlers ---
+
+// brandArgs is the shared argument structure for create_website and create_marketing.
+type brandArgs struct {
+	Domain         string   `json:"domain"`
+	BrandName      string   `json:"brand_name"`
+	Description    string   `json:"description"`
+	TargetAudience string   `json:"target_audience"`
+	Keywords       []string `json:"keywords"`
+}
+
+// fillDefaults fills empty fields from the campaign request and current result.
+func (b *brandArgs) fillDefaults(req CampaignRequest, selectedDomain string) {
+	if strings.TrimSpace(b.Domain) == "" {
+		b.Domain = selectedDomain
+	}
+	if strings.TrimSpace(b.BrandName) == "" {
+		b.BrandName = req.BrandName
+	}
+	if strings.TrimSpace(b.Description) == "" {
+		b.Description = req.Description
+	}
+	if strings.TrimSpace(b.TargetAudience) == "" {
+		b.TargetAudience = req.TargetAudience
+	}
+	if len(b.Keywords) == 0 {
+		b.Keywords = req.Keywords
+	}
+}
+
+func (b *brandArgs) toBrandInfo() BrandInfo {
+	return BrandInfo{
+		Name:           b.BrandName,
+		Description:    b.Description,
+		TargetAudience: b.TargetAudience,
+		Keywords:       b.Keywords,
+	}
+}
+
 func (a *MarketingCoordinatorImpl) handleDomainTool(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
 	var args struct {
 		Keywords []string `json:"keywords"`
@@ -211,122 +229,53 @@ func (a *MarketingCoordinatorImpl) handleDomainTool(ctx context.Context, tc open
 		return "", err
 	}
 
-	result, err := a.domainSvc.SuggestDomains(ctx, args.Keywords)
+	domains, err := a.domainSvc.SuggestDomains(ctx, args.Keywords)
 	if err != nil {
 		return "", err
 	}
 
-	a.result.Domains = result
-	if a.result.SelectedDomain == "" && len(result) > 0 {
-		a.result.SelectedDomain = result[0]
+	a.result.Domains = domains
+	if a.result.SelectedDomain == "" && len(domains) > 0 {
+		a.result.SelectedDomain = domains[0]
 	}
 
-	b, err := json.Marshal(map[string]interface{}{
-		"domains": result,
-		"count":   len(result),
-	})
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
+	return marshalJSON(map[string]interface{}{"domains": domains, "count": len(domains)})
 }
 
 func (a *MarketingCoordinatorImpl) handleWebsiteTool(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
-	var args struct {
-		Domain         string   `json:"domain"`
-		BrandName      string   `json:"brand_name"`
-		Description    string   `json:"description"`
-		TargetAudience string   `json:"target_audience"`
-		Keywords       []string `json:"keywords"`
-	}
+	var args brandArgs
 	if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
 		return "", err
 	}
-	if strings.TrimSpace(args.Domain) == "" {
-		args.Domain = a.result.SelectedDomain
-	}
-	if strings.TrimSpace(args.BrandName) == "" {
-		args.BrandName = a.current.BrandName
-	}
-	if strings.TrimSpace(args.Description) == "" {
-		args.Description = a.current.Description
-	}
-	if strings.TrimSpace(args.TargetAudience) == "" {
-		args.TargetAudience = a.current.TargetAudience
-	}
-	if len(args.Keywords) == 0 {
-		args.Keywords = a.current.Keywords
-	}
+	args.fillDefaults(a.req, a.result.SelectedDomain)
 
-	result, err := a.websiteSvc.GenerateWebsite(ctx, args.Domain, BrandInfo{
-		Name:           args.BrandName,
-		Description:    args.Description,
-		TargetAudience: args.TargetAudience,
-		Keywords:       args.Keywords,
-	})
+	content, err := a.websiteSvc.GenerateWebsite(ctx, args.Domain, args.toBrandInfo())
 	if err != nil {
 		return "", err
 	}
 
 	a.result.SelectedDomain = firstNonEmpty(args.Domain, a.result.SelectedDomain)
-	a.result.WebsiteFiles = result.Files
+	a.result.WebsiteFiles = content.Files
 
-	b, err := json.Marshal(map[string]interface{}{
-		"files": result.Files,
-	})
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
+	return marshalJSON(map[string]interface{}{"files": content.Files})
 }
 
 func (a *MarketingCoordinatorImpl) handleMarketingTool(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
-	var args struct {
-		Domain         string   `json:"domain"`
-		BrandName      string   `json:"brand_name"`
-		Description    string   `json:"description"`
-		TargetAudience string   `json:"target_audience"`
-		Keywords       []string `json:"keywords"`
-	}
+	var args brandArgs
 	if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
 		return "", err
 	}
-	if strings.TrimSpace(args.Domain) == "" {
-		args.Domain = a.result.SelectedDomain
-	}
-	if strings.TrimSpace(args.BrandName) == "" {
-		args.BrandName = a.current.BrandName
-	}
-	if strings.TrimSpace(args.Description) == "" {
-		args.Description = a.current.Description
-	}
-	if strings.TrimSpace(args.TargetAudience) == "" {
-		args.TargetAudience = a.current.TargetAudience
-	}
-	if len(args.Keywords) == 0 {
-		args.Keywords = a.current.Keywords
-	}
+	args.fillDefaults(a.req, a.result.SelectedDomain)
 
-	result, err := a.marketingSvc.CreateStrategy(ctx, args.Domain, BrandInfo{
-		Name:           args.BrandName,
-		Description:    args.Description,
-		TargetAudience: args.TargetAudience,
-		Keywords:       args.Keywords,
-	})
+	strategy, err := a.marketingSvc.CreateStrategy(ctx, args.Domain, args.toBrandInfo())
 	if err != nil {
 		return "", err
 	}
 
 	a.result.SelectedDomain = firstNonEmpty(args.Domain, a.result.SelectedDomain)
-	a.result.MarketingStrategy = result
+	a.result.MarketingStrategy = strategy
 
-	b, err := json.Marshal(map[string]interface{}{
-		"strategy_markdown": result,
-	})
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
+	return marshalJSON(map[string]interface{}{"strategy_markdown": strategy})
 }
 
 func (a *MarketingCoordinatorImpl) handleLogoTool(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
@@ -338,24 +287,26 @@ func (a *MarketingCoordinatorImpl) handleLogoTool(ctx context.Context, tc openai
 		return "", err
 	}
 	if strings.TrimSpace(args.BrandName) == "" {
-		args.BrandName = a.current.BrandName
+		args.BrandName = a.req.BrandName
+	}
+	if strings.TrimSpace(args.Style) == "" {
+		args.Style = "modern minimal"
 	}
 
-	style := args.Style
-	if strings.TrimSpace(style) == "" {
-		style = "modern minimal"
-	}
-
-	result, err := a.logoSvc.GenerateLogo(ctx, args.BrandName, style)
+	jpegData, err := a.logoSvc.GenerateLogo(ctx, args.BrandName, args.Style)
 	if err != nil {
 		return "", err
 	}
 
-	a.result.LogoFilepath = result
+	a.result.LogoJPEG = base64.StdEncoding.EncodeToString(jpegData)
 
-	b, err := json.Marshal(map[string]interface{}{
-		"filepath": result,
-	})
+	return marshalJSON(map[string]interface{}{"status": "logo generated", "size_bytes": len(jpegData)})
+}
+
+// --- helpers ---
+
+func marshalJSON(v interface{}) (string, error) {
+	b, err := json.Marshal(v)
 	if err != nil {
 		return "", err
 	}

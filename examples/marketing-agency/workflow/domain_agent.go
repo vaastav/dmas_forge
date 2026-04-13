@@ -61,58 +61,38 @@ func (a *DomainAgentImpl) SuggestDomains(ctx context.Context, keywords []string)
 		Domains []string `json:"domains"`
 	}
 	if unmarshalJSONFromLLMResponse(resp, &parsed) {
-		sanitized := sanitizeDomainList(parsed.Domains)
-		if len(sanitized) > 0 {
-			return sanitized, nil
+		domains := filterDomains(parsed.Domains)
+		if len(domains) > 0 {
+			return domains, nil
 		}
 	}
 
-	return sanitizeDomainList(parseDomainListFallback(resp)), nil
+	// Fallback: return raw response lines that look like domains.
+	return filterDomains(strings.Split(resp, "\n")), nil
 }
 
-func sanitizeDomainList(in []string) []string {
+// filterDomains deduplicates, normalizes, and keeps only valid-looking domain names.
+func filterDomains(candidates []string) []string {
 	seen := map[string]struct{}{}
 	out := make([]string, 0, 10)
-	for _, item := range in {
-		normalized := strings.ToLower(strings.TrimSpace(item))
-		normalized = strings.TrimPrefix(normalized, "- ")
-		normalized = strings.TrimPrefix(normalized, "* ")
-		if normalized == "" {
+	for _, s := range candidates {
+		d := strings.ToLower(strings.TrimSpace(s))
+		if d == "" {
 			continue
 		}
-		if _, ok := seen[normalized]; ok {
+		if _, ok := seen[d]; ok {
 			continue
 		}
-		if !looksLikeDomain(normalized) {
+		if !looksLikeDomain(d) {
 			continue
 		}
-		seen[normalized] = struct{}{}
-		out = append(out, normalized)
+		seen[d] = struct{}{}
+		out = append(out, d)
 		if len(out) == 10 {
 			break
 		}
 	}
 	return out
-}
-
-func parseDomainListFallback(response string) []string {
-	lines := strings.Split(response, "\n")
-	items := make([]string, 0, 10)
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		for i := 1; i <= 20; i++ {
-			line = strings.TrimPrefix(line, fmt.Sprintf("%d. ", i))
-		}
-		line = strings.TrimPrefix(line, "- ")
-		line = strings.TrimSpace(line)
-		if looksLikeDomain(line) {
-			items = append(items, line)
-		}
-	}
-	return items
 }
 
 func looksLikeDomain(s string) bool {
