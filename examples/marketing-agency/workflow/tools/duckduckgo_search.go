@@ -55,13 +55,12 @@ func DuckDuckGoSearchHandler() core.ToolHandlerFn {
 		}
 
 		results, err := performSearch(ctx, args.Query)
-		if err != nil {
-			return "", fmt.Errorf("duckduckgo search failed: %w", err)
-		}
-
 		payload := map[string]interface{}{
 			"query":   args.Query,
 			"results": results,
+		}
+		if err != nil {
+			payload["error"] = fmt.Sprintf("duckduckgo search failed: %v", err)
 		}
 		b, err := json.Marshal(payload)
 		if err != nil {

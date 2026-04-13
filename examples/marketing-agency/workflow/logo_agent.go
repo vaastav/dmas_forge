@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -52,7 +51,7 @@ func (a *LogoAgentImpl) GenerateLogo(ctx context.Context, brandName, style strin
 	var payload struct {
 		Filepath string `json:"filepath"`
 	}
-	if err := json.Unmarshal([]byte(extractJSONPayload(resp)), &payload); err == nil && strings.TrimSpace(payload.Filepath) != "" {
+	if unmarshalJSONFromLLMResponse(resp, &payload) && strings.TrimSpace(payload.Filepath) != "" {
 		return payload.Filepath, nil
 	}
 

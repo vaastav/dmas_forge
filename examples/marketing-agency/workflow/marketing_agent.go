@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -39,7 +38,7 @@ func (a *MarketingAgentImpl) CreateStrategy(ctx context.Context, domain string, 
 	var payload struct {
 		StrategyMarkdown string `json:"strategy_markdown"`
 	}
-	if err := json.Unmarshal([]byte(extractJSONPayload(resp)), &payload); err == nil && strings.TrimSpace(payload.StrategyMarkdown) != "" {
+	if unmarshalJSONFromLLMResponse(resp, &payload) && strings.TrimSpace(payload.StrategyMarkdown) != "" {
 		return payload.StrategyMarkdown, nil
 	}
 

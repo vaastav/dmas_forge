@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -39,7 +38,7 @@ func (a *WebsiteAgentImpl) GenerateWebsite(ctx context.Context, domain string, b
 	var payload struct {
 		Files map[string]string `json:"files"`
 	}
-	if err := json.Unmarshal([]byte(extractJSONPayload(resp)), &payload); err == nil && len(payload.Files) > 0 {
+	if unmarshalJSONFromLLMResponse(resp, &payload) && hasRequiredWebsiteFiles(payload.Files) {
 		return WebsiteContent{Files: payload.Files}, nil
 	}
 
@@ -83,4 +82,20 @@ func parseWebsiteFilesFallback(response string) map[string]string {
 	flush()
 
 	return files
+}
+
+func hasRequiredWebsiteFiles(files map[string]string) bool {
+	if len(files) == 0 {
+		return false
+	}
+
+	required := []string{"index.html", "about.html", "services.html", "contact.html", "style.css", "script.js"}
+	for _, name := range required {
+		content, ok := files[name]
+		if !ok || strings.TrimSpace(content) == "" {
+			return false
+		}
+	}
+
+	return true
 }

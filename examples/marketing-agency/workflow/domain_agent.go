@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -49,8 +48,11 @@ func (a *DomainAgentImpl) SuggestDomains(ctx context.Context, keywords []string)
 	var parsed struct {
 		Domains []string `json:"domains"`
 	}
-	if err := json.Unmarshal([]byte(extractJSONPayload(resp)), &parsed); err == nil && len(parsed.Domains) > 0 {
-		return sanitizeDomainList(parsed.Domains), nil
+	if unmarshalJSONFromLLMResponse(resp, &parsed) {
+		sanitized := sanitizeDomainList(parsed.Domains)
+		if len(sanitized) > 0 {
+			return sanitized, nil
+		}
 	}
 
 	return sanitizeDomainList(parseDomainListFallback(resp)), nil
