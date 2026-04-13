@@ -10,6 +10,18 @@ import (
 	"github.com/vaastav/agentic_blueprint/examples/marketing-agency/workflow/tools"
 )
 
+const domainAgentPrompt = `You are a domain naming specialist.
+
+Task:
+- Generate many domain ideas from brand keywords.
+- Use duckduckgo_search to look for evidence the domain may already be active.
+- Return exactly 10 candidate domains that appear available.
+
+Output format:
+Return valid JSON only:
+{"domains":["example.com","example.io",...]}
+`
+
 type DomainAgentImpl struct {
 	agent core.Agent
 }
@@ -17,7 +29,7 @@ type DomainAgentImpl struct {
 func NewDomainAgentImpl(ctx context.Context, agent core.Agent) (DomainAgent, error) {
 	a := &DomainAgentImpl{agent: agent}
 
-	if err := a.agent.AddSystemPrompt(ctx, DomainAgentPrompt); err != nil {
+	if err := a.agent.AddSystemPrompt(ctx, domainAgentPrompt); err != nil {
 		return nil, err
 	}
 

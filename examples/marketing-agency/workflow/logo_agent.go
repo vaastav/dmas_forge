@@ -11,6 +11,18 @@ import (
 	"github.com/vaastav/agentic_blueprint/examples/marketing-agency/workflow/tools"
 )
 
+const logoAgentPrompt = `You are a brand designer.
+
+Task:
+- Create a strong logo generation prompt from brand context.
+- Use generate_image tool exactly once.
+- Return the saved image filepath.
+
+Output format:
+Return valid JSON only:
+{"filepath":"artifacts/<file>.png"}
+`
+
 type LogoAgentImpl struct {
 	agent core.Agent
 }
@@ -19,7 +31,7 @@ func NewLogoAgentImpl(ctx context.Context, agent core.Agent, outputDir, apiKey, 
 	a := &LogoAgentImpl{agent: agent}
 	client := openai.NewClient(option.WithAPIKey(apiKey), option.WithBaseURL(baseURL))
 
-	if err := a.agent.AddSystemPrompt(ctx, LogoAgentPrompt); err != nil {
+	if err := a.agent.AddSystemPrompt(ctx, logoAgentPrompt); err != nil {
 		return nil, err
 	}
 

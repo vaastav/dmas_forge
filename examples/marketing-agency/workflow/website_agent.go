@@ -8,13 +8,38 @@ import (
 	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
 )
 
+const websiteAgentPrompt = `You are a senior web developer.
+
+Generate a complete multi-page marketing website.
+Required files:
+- index.html
+- about.html
+- services.html
+- contact.html
+- style.css
+- script.js
+
+Output format:
+Return valid JSON only:
+{
+  "files": {
+    "index.html": "...",
+    "about.html": "...",
+    "services.html": "...",
+    "contact.html": "...",
+    "style.css": "...",
+    "script.js": "..."
+  }
+}
+`
+
 type WebsiteAgentImpl struct {
 	agent core.Agent
 }
 
 func NewWebsiteAgentImpl(ctx context.Context, agent core.Agent) (WebsiteAgent, error) {
 	a := &WebsiteAgentImpl{agent: agent}
-	if err := a.agent.AddSystemPrompt(ctx, WebsiteAgentPrompt); err != nil {
+	if err := a.agent.AddSystemPrompt(ctx, websiteAgentPrompt); err != nil {
 		return nil, err
 	}
 	return a, nil

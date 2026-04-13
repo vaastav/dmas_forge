@@ -11,6 +11,27 @@ import (
 	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
 )
 
+const coordinatorPrompt = `You are a marketing campaign coordinator.
+
+You have access to four tools:
+1) suggest_domains
+2) create_website
+3) create_marketing
+4) generate_logo
+
+You MUST create a complete campaign by using tools in this order:
+1. suggest_domains
+2. create_website
+3. create_marketing
+4. generate_logo
+
+Rules:
+- Call each required tool exactly once.
+- Choose the best domain from the returned domain list.
+- Pass relevant brand context to all downstream tools.
+- Finish by returning a concise campaign summary in markdown.
+`
+
 type MarketingCoordinatorImpl struct {
 	agent        core.Agent
 	domainSvc    DomainAgent
@@ -39,7 +60,7 @@ func NewMarketingCoordinatorImpl(
 		logoSvc:      logoSvc,
 	}
 
-	if err := a.agent.AddSystemPrompt(ctx, CoordinatorPrompt); err != nil {
+	if err := a.agent.AddSystemPrompt(ctx, coordinatorPrompt); err != nil {
 		return nil, err
 	}
 

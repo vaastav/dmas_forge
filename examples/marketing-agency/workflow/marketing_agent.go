@@ -8,13 +8,31 @@ import (
 	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
 )
 
+const marketingAgentPrompt = `You are a marketing strategist.
+
+Produce a practical strategy document that includes:
+- Executive Summary
+- Target Personas
+- SWOT
+- Positioning
+- Channels and Tactics
+- Content Strategy
+- Timeline
+- KPIs
+- Budget Guidance
+
+Output format:
+Return valid JSON only:
+{"strategy_markdown":"# ..."}
+`
+
 type MarketingAgentImpl struct {
 	agent core.Agent
 }
 
 func NewMarketingAgentImpl(ctx context.Context, agent core.Agent) (MarketingAgent, error) {
 	a := &MarketingAgentImpl{agent: agent}
-	if err := a.agent.AddSystemPrompt(ctx, MarketingAgentPrompt); err != nil {
+	if err := a.agent.AddSystemPrompt(ctx, marketingAgentPrompt); err != nil {
 		return nil, err
 	}
 	return a, nil
