@@ -7,7 +7,7 @@ It is based on the `marketing-agency` example from Google's adk repo, but reimpl
 The coordinator orchestrates four specialized agents:
 
 - `DomainAgent`: suggests candidate domains using DuckDuckGo search.
-- `WebsiteAgent`: generates website files (`index.html`, `about.html`, `services.html`, `contact.html`, `style.css`, `script.js`).
+- `WebsiteAgent`: asks the LLM for a compact file plan, then generates each planned file sequentially.
 - `MarketingAgent`: generates a full marketing strategy document.
 - `LogoAgent`: generates a logo image via OpenAI images API and returns it inline as JPEG.
 
@@ -29,9 +29,9 @@ Available wiring specs:
 | `single` | in-process | 1 container for all 5 services |
 | `http` | HTTP | 5 containers, 1 per service |
 
-The original example returns raw text and does no parsing, but this version expects structured output and parses each agent's result with JSON deserialization first, falling back to code-block extraction, and ultimately returning the raw model output if neither works.
+The original example returns raw text and does no parsing, but this version expects structured output and parses each agent's result with JSON deserialization first, falling back to code-block extraction where possible.
 
-Small models like GPT-5.4-nano may struggle with website generation because the output is large and can get truncated. A stronger model like GPT-5.4 is more reliable.
+The website agent mirrors the original website-creator prompt while avoiding one large all-files response. It first asks the model for a compact JSON file plan, then generates each planned file in a separate sequential call.
 
 # Limitations
 
