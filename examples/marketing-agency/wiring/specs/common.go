@@ -7,10 +7,6 @@ import (
 	"os"
 
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/wiring"
-	"github.com/blueprint-uservices/blueprint/plugins/cmdbuilder"
-	"github.com/blueprint-uservices/blueprint/plugins/goproc"
-	"github.com/blueprint-uservices/blueprint/plugins/http"
-	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
 
 	"github.com/vaastav/agentic_blueprint/ai_plugins/openai_plugin"
@@ -23,18 +19,20 @@ type ModelInfo struct {
 	Key  string `json:"key"`
 }
 
-var Docker = cmdbuilder.SpecOption{
-	Name:        "docker",
-	Description: "Deploy marketing agency coordinator as HTTP service in Docker",
-	Build:       makeDockerSpec,
+type marketingServices struct {
+	domainService      string
+	websiteService     string
+	marketingService   string
+	logoService        string
+	coordinatorService string
 }
 
 var modelFile = flag.String("modfile", "model.json", "Specific model related information")
 
-func makeDockerSpec(spec wiring.WiringSpec) ([]string, error) {
+func defineMarketingServices(spec wiring.WiringSpec) (marketingServices, error) {
 	model, err := readModelInfo()
 	if err != nil {
-		return []string{}, err
+		return marketingServices{}, err
 	}
 
 	domainAgentCore := openai_plugin.OpenAILLMAgent(
@@ -78,25 +76,22 @@ func makeDockerSpec(spec wiring.WiringSpec) ([]string, error) {
 		openai_plugin.AgentConfig{},
 	)
 
-	domainService := workflow.Service[wf.DomainAgent](spec, "domain_service", domainAgentCore)
-	websiteService := workflow.Service[wf.WebsiteAgent](spec, "website_service", websiteAgentCore)
-	marketingService := workflow.Service[wf.MarketingAgent](spec, "marketing_service", marketingAgentCore)
-	logoService := workflow.Service[wf.LogoAgent](spec, "logo_service", logoAgentCore, model.Key, model.URL)
-	coordinatorService := workflow.Service[wf.MarketingCoordinator](
+	services := marketingServices{}
+	services.domainService = workflow.Service[wf.DomainAgent](spec, "domain_service", domainAgentCore)
+	services.websiteService = workflow.Service[wf.WebsiteAgent](spec, "website_service", websiteAgentCore)
+	services.marketingService = workflow.Service[wf.MarketingAgent](spec, "marketing_service", marketingAgentCore)
+	services.logoService = workflow.Service[wf.LogoAgent](spec, "logo_service", logoAgentCore, model.Key, model.URL)
+	services.coordinatorService = workflow.Service[wf.MarketingCoordinator](
 		spec,
 		"coordinator_service",
 		coordinatorCore,
-		domainService,
-		websiteService,
-		marketingService,
-		logoService,
+		services.domainService,
+		services.websiteService,
+		services.marketingService,
+		services.logoService,
 	)
 
-	http.Deploy(spec, coordinatorService)
-	goproc.Deploy(spec, coordinatorService)
-
-	ctr := linuxcontainer.Deploy(spec, coordinatorService)
-	return []string{ctr}, nil
+	return services, nil
 }
 
 func readModelInfo() (ModelInfo, error) {

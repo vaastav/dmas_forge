@@ -9,6 +9,7 @@ func main() {
 	name := "marketing-agency"
 	cmdbuilder.MakeAndExecute(
 		name,
-		specs.Docker,
+		specs.Single,
+		specs.HTTP,
 	)
 }

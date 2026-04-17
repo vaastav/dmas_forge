@@ -16,11 +16,18 @@ The coordinator orchestrates four specialized agents:
 - Workflow code: `examples/marketing-agency/workflow`
 - Wiring/deployment code: `examples/marketing-agency/wiring`
 
-The workflow layer is protocol-agnostic. Wiring layer handles deployment as HTTP service in Docker.
+The workflow layer is protocol-agnostic. The wiring layer can run the workflow in a single container or split it into one container per service over HTTP.
 
 # Differences from the ADK Reference Implementation
 
-Unlike the original, where sub-agents are tools inside a single process, this reimplementation wires each agent as a separate Go service within the same process.
+Unlike the original, where sub-agents are tools inside a single process, this reimplementation wires each agent as a separate Go service that can run either in one container or as one container per service.
+
+Available wiring specs:
+
+| Wiring spec | Protocol | Config |
+|---|---|---|
+| `single` | in-process | 1 container for all 5 services |
+| `http` | HTTP | 5 containers, 1 per service |
 
 The original example returns raw text and does no parsing, but this version expects structured output and parses each agent's result with JSON deserialization first, falling back to code-block extraction, and ultimately returning the raw model output if neither works.
 
@@ -47,10 +54,16 @@ Edit `examples/marketing-agency/wiring/example_model.json`:
 
 ```bash
 cd examples/marketing-agency/wiring
-go run main.go -w docker -o build -modfile=./example_model.json
+go run main.go -w single -o build -modfile=./example_model.json
 cd build/docker
 cp ../.local.env .env
 docker compose build && docker compose up -d
+```
+
+To generate the split HTTP configuration:
+
+```bash
+go run main.go -w http -o build -modfile=./example_model.json
 ```
 
 ## Usage
