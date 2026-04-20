@@ -23,6 +23,7 @@ Several example applications are provided in the [`examples/`](examples/) direct
 | [weather](examples/weather/) | Multi-agent weather report with disaster risk assessment | 2 (WeatherAgent + DisasterAgent) | Tool use, inter-agent communication, multiple wiring specs (HTTP, A2A, MCP) |
 | [chat](examples/chat/) | Conversational agent with persistent memory | 1 (ChatAgent) | LLM-driven memory tools, decorator pattern, multi-round tool calls |
 | [rag_chat](examples/rag_chat/) | RAG chat with automatic and agentic retrieval modes | 1 (ChatAgent + RAG) | RAG, embeddings, vector store, configurable knowledge base |
+| [marketing-agency](examples/marketing-agency/) | Multi-agent marketing campaign coordinator | 5 (Coordinator, DomainAgent, WebsiteAgent, MarketingAgent, LogoAgent) | Inter-agent delegation, tool use (DuckDuckGo search), OpenAI images API |
 | [travel-planning](examples/travel-planning/) | AutoGen-style multi-agent travel planning with round-robin termination | 5 (Coordinator + 4 specialists) | Round-robin orchestration, shared transcript context, `TERMINATE` stop condition |
 
 Each example has its own README with setup and usage instructions.
