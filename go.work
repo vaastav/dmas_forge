@@ -9,6 +9,8 @@ use (
 	./examples/marketing-agency/workflow
 	./examples/rag_chat/wiring
 	./examples/rag_chat/workflow
+	./examples/travel-planning/wiring
+	./examples/travel-planning/workflow
 	./examples/weather/wiring
 	./examples/weather/workflow
 )
