@@ -1,10 +1,7 @@
 package specs
 
 import (
-	"encoding/json"
 	"flag"
-	"io"
-	"os"
 
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/wiring"
 	"github.com/blueprint-uservices/blueprint/plugins/cmdbuilder"
@@ -13,15 +10,10 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
 
+	"github.com/vaastav/agentic_blueprint/ai_plugins/model"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/openai_plugin"
 	wf "github.com/vaastav/agentic_blueprint/examples/travel-planning/workflow"
 )
-
-type ModelInfo struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
-	Key  string `json:"key"`
-}
 
 var Docker = cmdbuilder.SpecOption{
 	Name:        "docker",
@@ -32,7 +24,7 @@ var Docker = cmdbuilder.SpecOption{
 var modelFile = flag.String("modfile", "model.json", "Specific model related information")
 
 func makeDockerSpec(spec wiring.WiringSpec) ([]string, error) {
-	modelInfo, err := readModelInfo()
+	modelInfo, err := model.GetModelInfo()
 	if err != nil {
 		return []string{}, err
 	}
@@ -64,25 +56,4 @@ func makeDockerSpec(spec wiring.WiringSpec) ([]string, error) {
 	coordinatorContainer := applyDockerDefaults(coordinatorService)
 
 	return []string{plannerContainer, localContainer, languageContainer, summaryContainer, coordinatorContainer}, nil
-}
-
-func readModelInfo() (ModelInfo, error) {
-	file, err := os.Open(*modelFile)
-	if err != nil {
-		return ModelInfo{}, err
-	}
-	defer file.Close()
-
-	allBytes, err := io.ReadAll(file)
-	if err != nil {
-		return ModelInfo{}, err
-	}
-
-	var info ModelInfo
-	err = json.Unmarshal(allBytes, &info)
-	if err != nil {
-		return ModelInfo{}, err
-	}
-
-	return info, nil
 }

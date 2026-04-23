@@ -1,10 +1,6 @@
 package specs
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"os"
-
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/wiring"
 	"github.com/blueprint-uservices/blueprint/plugins/cmdbuilder"
 	"github.com/blueprint-uservices/blueprint/plugins/goproc"
@@ -12,6 +8,7 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/mcp"
+	"github.com/vaastav/agentic_blueprint/ai_plugins/model"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/openai_plugin"
 	wf "github.com/vaastav/agentic_blueprint/examples/weather/workflow"
 )
@@ -34,18 +31,7 @@ func makeMCPSpec(spec wiring.WiringSpec) ([]string, error) {
 		return linuxcontainer.Deploy(spec, serviceName)
 	}
 
-	var minfo ModelInfo
-	file, err := os.Open(*model_file)
-	if err != nil {
-		return []string{}, err
-	}
-	defer file.Close()
-
-	all_bytes, err := ioutil.ReadAll(file)
-	if err != nil {
-		return []string{}, err
-	}
-	err = json.Unmarshal(all_bytes, &minfo)
+	minfo, err := model.GetModelInfo()
 	if err != nil {
 		return []string{}, err
 	}
