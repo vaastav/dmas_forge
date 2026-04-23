@@ -98,7 +98,7 @@ func (handler *{{.Name}}) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	srv, err := server.NewA2AServer(agentCard, baseTaskManager, server.WithCORSEnabled(true))
+	srv, err := server.NewA2AServer(agentCard, baseTaskManager, server.WithCORSEnabled(true), server.WithReadTimeout(0), server.WithWriteTimeout(0))
 	if err != nil {
 		return err
 	}
