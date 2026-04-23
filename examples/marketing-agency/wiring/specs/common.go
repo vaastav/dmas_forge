@@ -1,23 +1,15 @@
 package specs
 
 import (
-	"encoding/json"
 	"flag"
-	"io"
-	"os"
 
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/wiring"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
 
+	"github.com/vaastav/agentic_blueprint/ai_plugins/model"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/openai_plugin"
 	wf "github.com/vaastav/agentic_blueprint/examples/marketing-agency/workflow"
 )
-
-type ModelInfo struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
-	Key  string `json:"key"`
-}
 
 type marketingServices struct {
 	domainService      string
@@ -30,7 +22,7 @@ type marketingServices struct {
 var modelFile = flag.String("modfile", "model.json", "Specific model related information")
 
 func defineMarketingServices(spec wiring.WiringSpec) (marketingServices, error) {
-	model, err := readModelInfo()
+	model, err := model.GetModelInfo()
 	if err != nil {
 		return marketingServices{}, err
 	}
@@ -92,24 +84,4 @@ func defineMarketingServices(spec wiring.WiringSpec) (marketingServices, error) 
 	)
 
 	return services, nil
-}
-
-func readModelInfo() (ModelInfo, error) {
-	var minfo ModelInfo
-	file, err := os.Open(*modelFile)
-	if err != nil {
-		return ModelInfo{}, err
-	}
-	defer file.Close()
-
-	b, err := io.ReadAll(file)
-	if err != nil {
-		return ModelInfo{}, err
-	}
-
-	if err := json.Unmarshal(b, &minfo); err != nil {
-		return ModelInfo{}, err
-	}
-
-	return minfo, nil
 }

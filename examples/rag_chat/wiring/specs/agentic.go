@@ -7,6 +7,7 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/http"
 	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
+	"github.com/vaastav/agentic_blueprint/ai_plugins/model"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/openai_plugin"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/rag_plugin"
 	ragruntime "github.com/vaastav/agentic_blueprint/ai_runtime/plugins/rag"
@@ -21,7 +22,7 @@ var Agentic = cmdbuilder.SpecOption{
 }
 
 func makeAgenticSpec(spec wiring.WiringSpec) ([]string, error) {
-	model, err := readModelInfo()
+	model, err := model.GetModelInfo()
 	if err != nil {
 		return nil, err
 	}

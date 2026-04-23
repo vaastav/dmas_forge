@@ -8,9 +8,10 @@ import (
 )
 
 type ModelInfo struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
-	Key  string `json:"key"`
+	Name           string `json:"name"`
+	URL            string `json:"url"`
+	Key            string `json:"key"`
+	EmbeddingModel string `json:"embedding_model"`
 }
 
 var model_file = flag.String("modfile", "model.json", "Specific model related information")
