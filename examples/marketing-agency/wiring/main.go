@@ -12,5 +12,6 @@ func main() {
 		specs.Single,
 		specs.HTTP,
 		specs.MCP,
+		specs.A2A,
 	)
 }
