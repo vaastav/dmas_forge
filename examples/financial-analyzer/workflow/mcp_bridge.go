@@ -14,7 +14,6 @@ import (
 
 type MCPToolBridge struct {
 	sessions  []*mcp.ClientSession
-	clients   []*mcp.Client
 	toolToIdx map[string]int
 	tools     map[string]openai.ChatCompletionToolParam
 }
@@ -50,7 +49,6 @@ func NewMCPToolBridge(ctx context.Context, serverURLs []string) (*MCPToolBridge,
 
 		idx := len(b.sessions)
 		b.sessions = append(b.sessions, session)
-		b.clients = append(b.clients, client)
 
 		result, err := session.ListTools(ctx, nil)
 		if err != nil {

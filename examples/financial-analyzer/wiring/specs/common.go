@@ -1,51 +1,22 @@
 package specs
 
 import (
-	"encoding/json"
 	"flag"
-	"io"
-	"os"
 
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/wiring"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
 
+	"github.com/vaastav/agentic_blueprint/ai_plugins/model"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/openai_plugin"
 	wf "github.com/vaastav/agentic_blueprint/examples/financial-analyzer/workflow"
 )
 
-type ModelInfo struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
-	Key  string `json:"key"`
-}
-
-var modelFile = flag.String("modfile", "model.json", "Specific model related information")
 var mcpServers = flag.String("mcp-servers", "http://localhost:8080", "Comma-separated list of MCP server URLs for search/fetch tools")
 
 const (
 	defaultCompany = "Apple"
 	defaultMode    = "sanity"
 )
-
-func readModelInfo() (ModelInfo, error) {
-	var minfo ModelInfo
-	file, err := os.Open(*modelFile)
-	if err != nil {
-		return ModelInfo{}, err
-	}
-	defer file.Close()
-
-	b, err := io.ReadAll(file)
-	if err != nil {
-		return ModelInfo{}, err
-	}
-
-	if err := json.Unmarshal(b, &minfo); err != nil {
-		return ModelInfo{}, err
-	}
-
-	return minfo, nil
-}
 
 type financialServices struct {
 	collectorService   string
@@ -57,7 +28,7 @@ type financialServices struct {
 }
 
 func defineFinancialServices(spec wiring.WiringSpec) (financialServices, error) {
-	model, err := readModelInfo()
+	minfo, err := model.GetModelInfo()
 	if err != nil {
 		return financialServices{}, err
 	}
@@ -66,12 +37,12 @@ func defineFinancialServices(spec wiring.WiringSpec) (financialServices, error) 
 	mode := wf.NormalizeMode(defaultMode)
 	mcpServerURLs := *mcpServers
 
-	collectorCore := openai_plugin.OpenAILLMAgent(spec, "collector_core", model.URL, model.Key, model.Name, openai_plugin.AgentConfig{})
-	evaluatorCore := openai_plugin.OpenAILLMAgent(spec, "evaluator_core", model.URL, model.Key, model.Name, openai_plugin.AgentConfig{})
-	analystCore := openai_plugin.OpenAILLMAgent(spec, "analyst_core", model.URL, model.Key, model.Name, openai_plugin.AgentConfig{})
-	writerCore := openai_plugin.OpenAILLMAgent(spec, "writer_core", model.URL, model.Key, model.Name, openai_plugin.AgentConfig{})
-	coordinatorCore := openai_plugin.OpenAILLMAgent(spec, "coordinator_core", model.URL, model.Key, model.Name, openai_plugin.AgentConfig{})
-	researcherCore := openai_plugin.OpenAILLMAgent(spec, "researcher_core", model.URL, model.Key, model.Name, openai_plugin.AgentConfig{})
+	collectorCore := openai_plugin.OpenAILLMAgent(spec, "collector_core", minfo.URL, minfo.Key, minfo.Name, openai_plugin.AgentConfig{})
+	evaluatorCore := openai_plugin.OpenAILLMAgent(spec, "evaluator_core", minfo.URL, minfo.Key, minfo.Name, openai_plugin.AgentConfig{})
+	analystCore := openai_plugin.OpenAILLMAgent(spec, "analyst_core", minfo.URL, minfo.Key, minfo.Name, openai_plugin.AgentConfig{})
+	writerCore := openai_plugin.OpenAILLMAgent(spec, "writer_core", minfo.URL, minfo.Key, minfo.Name, openai_plugin.AgentConfig{})
+	coordinatorCore := openai_plugin.OpenAILLMAgent(spec, "coordinator_core", minfo.URL, minfo.Key, minfo.Name, openai_plugin.AgentConfig{})
+	researcherCore := openai_plugin.OpenAILLMAgent(spec, "researcher_core", minfo.URL, minfo.Key, minfo.Name, openai_plugin.AgentConfig{})
 
 	services := financialServices{}
 	services.collectorService = workflow.Service[wf.DataCollectorAgent](spec, "collector_service", collectorCore, mcpServerURLs, company, mode)

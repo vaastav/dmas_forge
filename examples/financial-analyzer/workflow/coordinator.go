@@ -209,6 +209,7 @@ func coordinatorToolSchemas() map[string]openai.ChatCompletionToolParam {
 			"run_research_quality_controller",
 			"Gather financial research, evaluate quality, and refine until the research reaches the required threshold.",
 			map[string]interface{}{"company": map[string]interface{}{"type": "string"}, "mode": map[string]interface{}{"type": "string"}},
+			[]string{"company", "mode"},
 		),
 		"run_financial_analyst": simpleTool(
 			"run_financial_analyst",
@@ -218,6 +219,7 @@ func coordinatorToolSchemas() map[string]openai.ChatCompletionToolParam {
 				"mode":              map[string]interface{}{"type": "string"},
 				"research_markdown": map[string]interface{}{"type": "string"},
 			},
+			[]string{"company", "mode", "research_markdown"},
 		),
 		"run_report_writer": simpleTool(
 			"run_report_writer",
@@ -228,11 +230,12 @@ func coordinatorToolSchemas() map[string]openai.ChatCompletionToolParam {
 				"research_markdown": map[string]interface{}{"type": "string"},
 				"analysis_markdown": map[string]interface{}{"type": "string"},
 			},
+			[]string{"company", "mode", "research_markdown", "analysis_markdown"},
 		),
 	}
 }
 
-func simpleTool(name, description string, properties map[string]interface{}) openai.ChatCompletionToolParam {
+func simpleTool(name, description string, properties map[string]interface{}, required []string) openai.ChatCompletionToolParam {
 	return openai.ChatCompletionToolParam{
 		Function: openai.FunctionDefinitionParam{
 			Name:        name,
@@ -240,6 +243,7 @@ func simpleTool(name, description string, properties map[string]interface{}) ope
 			Parameters: openai.FunctionParameters{
 				"type":       "object",
 				"properties": properties,
+				"required":   required,
 			},
 		},
 	}
