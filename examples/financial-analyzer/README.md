@@ -83,31 +83,20 @@ If multiple servers expose the same tool name, the last one wins.
 
 ### Company and mode
 
-Company and mode are **request-time parameters** passed when calling the coordinator, not config-file values. The wired-in defaults are `"Apple"` and `"sanity"`, which are used when the request omits them.
+Company and mode are passed when calling the coordinator, not config-file values. The defaults are `"Apple"` and `"sanity"`, which are used when the request omits them.
 
 ## Build
-
-> [!NOTE]
-> **Go version patch required:** The Blueprint framework hardcodes `go 1.23.1` in generated `go.work` and `golang:1.23` in Dockerfiles, but the MCP SDK dependency requires Go 1.24+. After each build, run `patch_go_version.sh` on the output directory before `docker compose build`. This is a temporary workaround.
 
 ```bash
 cd examples/financial-analyzer/wiring
 
 # Single-container deployment with one MCP server
 go run main.go -w single -modfile=./example_model.json -mcp-servers=http://localhost:8080 -o build
-./patch_go_version.sh build
 
-# One container per service, separate search and fetch MCP servers
-go run main.go -w http -modfile=./example_model.json -mcp-servers=http://localhost:8080,http://localhost:8081 -o build-http
-./patch_go_version.sh build-http
-
-# MCP wiring with Tavily + fetch
-go run main.go -w mcp -modfile=./example_model.json -mcp-servers=http://localhost:8080 -o build-mcp
-./patch_go_version.sh build-mcp
-
-# A2A wiring with sub-agents over A2A
-go run main.go -w a2a -modfile=./example_model.json -mcp-servers=http://localhost:8080 -o build-a2a
-./patch_go_version.sh build-a2a
+# Or one of the Multi-container deployment options:
+go run main.go -w http -modfile=./example_model.json -mcp-servers=http://localhost:8080,http://localhost:8081 -o build
+go run main.go -w mcp -modfile=./example_model.json -mcp-servers=https://mcp.tavily.com/mcp/?tavilyApiKey=<YOUR_API_KEY> -o build
+go run main.go -w a2a -modfile=./example_model.json -mcp-servers=http://localhost:8080 -o build
 ```
 
 ## Usage
@@ -122,9 +111,13 @@ https://mcp.tavily.com/mcp/?tavilyApiKey=<YOUR_API_KEY>
 
 ```bash
 # After building with one of the commands above, run the generated container
+cd build/docker
+cp ../.local.env .env
+docker compose build
+docker compose up
 ```
 
-The generated coordinator exposes `Analyze(company, mode)`.
+3. Send a request to the coordinator's HTTP endpoint:
 
 Example request:
 
@@ -133,6 +126,9 @@ curl --get 'http://localhost:12345/Analyze' \
   --data-urlencode 'company=Apple' \
   --data-urlencode 'mode=sanity'
 ```
+
+> [!NOTE]
+> The port shown above (`12345`) may change depending on your system. Run `docker ps` to see which localhost port the coordinator service is mapped to.
 
 The response contains a `Ret0` object with:
 
