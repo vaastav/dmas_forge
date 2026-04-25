@@ -11,6 +11,8 @@ import (
 )
 
 func GenerateServerHandler(builder golang.ModuleBuilder, service *gocode.ServiceInterface, outputPackage string) error {
+	RequireMCPSDK(builder)
+
 	pkg, err := builder.CreatePackage(outputPackage)
 	if err != nil {
 		return err
