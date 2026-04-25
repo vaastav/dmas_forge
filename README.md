@@ -25,6 +25,7 @@ Several example applications are provided in the [`examples/`](examples/) direct
 | [rag_chat](examples/rag_chat/) | RAG chat with automatic and agentic retrieval modes | 1 (ChatAgent + RAG) | RAG, embeddings, vector store, configurable knowledge base |
 | [marketing-agency](examples/marketing-agency/) | Multi-agent marketing campaign coordinator | 5 (Coordinator, DomainAgent, WebsiteAgent, MarketingAgent, LogoAgent) | Inter-agent delegation, tool use (DuckDuckGo search), OpenAI images API |
 | [travel-planning](examples/travel-planning/) | AutoGen-style multi-agent travel planning with round-robin termination | 5 (Coordinator + 4 specialists) | Round-robin orchestration, shared transcript context, `TERMINATE` stop condition |
+| [financial-analyzer](examples/financial-analyzer/) | Multi-agent financial analysis with research refinement loop | 6 (Coordinator, DataCollector, DataEvaluator, ResearchQualityController, FinancialAnalyst, ReportWriter) | Pluggable MCP Servers, Evaluator-Optimizer loop, multiple wiring specs (single, HTTP, MCP, A2A) |
 
 Each example has its own README with setup and usage instructions.
 
