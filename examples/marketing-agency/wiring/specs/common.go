@@ -1,8 +1,6 @@
 package specs
 
 import (
-	"flag"
-
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/wiring"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
 
@@ -18,8 +16,6 @@ type marketingServices struct {
 	logoService        string
 	coordinatorService string
 }
-
-var modelFile = flag.String("modfile", "model.json", "Specific model related information")
 
 func defineMarketingServices(spec wiring.WiringSpec) (marketingServices, error) {
 	model, err := model.GetModelInfo()

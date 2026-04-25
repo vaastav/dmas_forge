@@ -1,8 +1,6 @@
 package specs
 
 import (
-	"flag"
-
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/wiring"
 	"github.com/blueprint-uservices/blueprint/plugins/cmdbuilder"
 	"github.com/blueprint-uservices/blueprint/plugins/goproc"
@@ -20,8 +18,6 @@ var Docker = cmdbuilder.SpecOption{
 	Description: "Deploys travel-planning agents in containers with HTTP, using OpenAI models",
 	Build:       makeDockerSpec,
 }
-
-var modelFile = flag.String("modfile", "model.json", "Specific model related information")
 
 func makeDockerSpec(spec wiring.WiringSpec) ([]string, error) {
 	modelInfo, err := model.GetModelInfo()
