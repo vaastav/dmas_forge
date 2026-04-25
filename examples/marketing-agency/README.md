@@ -28,6 +28,10 @@ Available wiring specs:
 |---|---|---|
 | `single` | in-process | 1 container for all 5 services |
 | `http` | HTTP | 5 containers, 1 per service |
+| `mcp` | MCP | 5 containers, 1 per service |
+| `a2a` | A2A | 5 containers, 1 per service |
+
+In each of these specs, the coordinator has the HTTP entrypoint.
 
 The original example returns raw text and does no parsing, but this version expects structured output and parses each agent's result with JSON deserialization first, falling back to code-block extraction where possible.
 
@@ -64,6 +68,18 @@ To generate the split HTTP configuration:
 
 ```bash
 go run main.go -w http -o build -modfile=./example_model.json
+```
+
+To generate the MCP configuration:
+
+```bash
+go run main.go -w mcp -o build -modfile=./example_model.json
+```
+
+To generate the A2A configuration:
+
+```bash
+go run main.go -w a2a -o build -modfile=./example_model.json
 ```
 
 ## Usage
