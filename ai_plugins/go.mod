@@ -1,6 +1,6 @@
 module github.com/vaastav/agentic_blueprint/ai_plugins
 
-go 1.22.1
+go 1.23.0
 
 require (
 	github.com/blueprint-uservices/blueprint/blueprint v0.0.0-20250729202253-a8f505263256
@@ -12,6 +12,7 @@ require github.com/vaastav/agentic_blueprint/ai_runtime v0.0.0
 replace github.com/vaastav/agentic_blueprint/ai_runtime => ../ai_runtime
 
 require (
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/openai/openai-go v1.11.1 // indirect
 	github.com/otiai10/copy v1.14.0 // indirect
 	github.com/tidwall/gjson v1.14.4 // indirect
@@ -19,8 +20,8 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
 	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f // indirect
-	golang.org/x/mod v0.17.0 // indirect
-	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
-	golang.org/x/tools v0.20.0 // indirect
+	golang.org/x/mod v0.25.0 // indirect
+	golang.org/x/sync v0.15.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/tools v0.34.0 // indirect
 )

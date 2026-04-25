@@ -11,6 +11,8 @@ import (
 )
 
 func GenerateServerHandler(builder golang.ModuleBuilder, service *gocode.ServiceInterface, outputPackage string) error {
+	RequireMCPSDK(builder)
+
 	pkg, err := builder.CreatePackage(outputPackage)
 	if err != nil {
 		return err
@@ -86,7 +88,7 @@ type {{$f.Name}}Params struct {
 	{{end}}
 }
 
-func (handler *{{$receiver}}) {{$f.Name -}} (ctx context.Context, req *mcp.CallToolRequest, params *{{$f.Name}}Params) (*mcp.CallToolResult, any, error) {
+func (handler *{{$receiver}}) {{$f.Name -}} (ctx context.Context, mcpReq *mcp.CallToolRequest, params *{{$f.Name}}Params) (*mcp.CallToolResult, any, error) {
 	{{range $_, $arg := $f.Arguments}}
 	{{$arg.Name}} := params.{{Title $arg.Name}}
 	{{end}}

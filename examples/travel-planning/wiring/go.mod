@@ -1,6 +1,6 @@
 module github.com/vaastav/agentic_blueprint/examples/travel-planning/wiring
 
-go 1.22.1
+go 1.23.0
 
 require github.com/vaastav/agentic_blueprint/examples/travel-planning/workflow v0.0.0
 
@@ -25,10 +25,10 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.26.0 // indirect
 	go.opentelemetry.io/otel/trace v1.26.0 // indirect
 	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f // indirect
-	golang.org/x/mod v0.17.0 // indirect
-	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
-	golang.org/x/tools v0.20.0 // indirect
+	golang.org/x/mod v0.25.0 // indirect
+	golang.org/x/sync v0.15.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/tools v0.34.0 // indirect
 )
 
 require (
