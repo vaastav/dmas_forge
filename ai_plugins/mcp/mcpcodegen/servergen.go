@@ -88,11 +88,11 @@ type {{$f.Name}}Params struct {
 	{{end}}
 }
 
-func (handler *{{$receiver}}) {{$f.Name -}} (mcpCtx context.Context, mcpReq *mcp.CallToolRequest, params *{{$f.Name}}Params) (*mcp.CallToolResult, any, error) {
+func (handler *{{$receiver}}) {{$f.Name -}} (ctx context.Context, mcpReq *mcp.CallToolRequest, params *{{$f.Name}}Params) (*mcp.CallToolResult, any, error) {
 	{{range $_, $arg := $f.Arguments}}
 	{{$arg.Name}} := params.{{Title $arg.Name}}
 	{{end}}
-	{{RetVars $f "err"}} := handler.Service.{{$f.Name}}({{ArgVars $f "mcpCtx"}})
+	{{RetVars $f "err"}} := handler.Service.{{$f.Name}}({{ArgVars $f "ctx"}})
 	if err != nil {
 		return nil, nil, err
 	}
