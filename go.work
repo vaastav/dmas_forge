@@ -5,6 +5,8 @@ use (
 	./ai_runtime
 	./examples/chat/wiring
 	./examples/chat/workflow
+	./examples/financial-analyzer/wiring
+	./examples/financial-analyzer/workflow
 	./examples/marketing-agency/wiring
 	./examples/marketing-agency/workflow
 	./examples/rag_chat/wiring
