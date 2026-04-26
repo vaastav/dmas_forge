@@ -10,24 +10,23 @@ import (
 )
 
 type FinancialAnalystAgentImpl struct {
-	agent          core.Agent
-	defaultCompany string
-	defaultMode    string
+	agent core.Agent
 }
 
-func NewFinancialAnalystAgentImpl(ctx context.Context, agent core.Agent, company string, mode string) (FinancialAnalystAgent, error) {
+func NewFinancialAnalystAgentImpl(ctx context.Context, agent core.Agent) (FinancialAnalystAgent, error) {
+	sysPrompt := prompts.AnalystPrompt()
+	if err := agent.AddSystemPrompt(ctx, sysPrompt); err != nil {
+		return nil, fmt.Errorf("adding analyst system prompt: %w", err)
+	}
+
 	return &FinancialAnalystAgentImpl{
-		agent:          agent,
-		defaultCompany: company,
-		defaultMode:    NormalizeMode(mode),
+		agent: agent,
 	}, nil
 }
 
 func (a *FinancialAnalystAgentImpl) AnalyzeData(ctx context.Context, req AnalysisRequest) (string, error) {
-	company := firstNonEmpty(req.Company, a.defaultCompany)
-	mode := NormalizeMode(firstNonEmpty(req.Mode, a.defaultMode))
-
-	if err := a.agent.AddSystemPrompt(ctx, prompts.AnalystPrompt(company, IsSanityMode(mode))); err != nil {
+	company, mode, err := requireCompanyAndMode(req.Company, req.Mode)
+	if err != nil {
 		return "", err
 	}
 

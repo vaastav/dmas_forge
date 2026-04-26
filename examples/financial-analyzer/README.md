@@ -7,7 +7,7 @@ A multi-agent financial analysis example that is behaviorally close to the origi
 Given a company name and mode, the example runs a coordinated set of agents:
 
 1. `ResearchQualityController` calls the `DataCollector` and `DataEvaluator` in a refinement loop.
-2. `FinancialAnalyzerCoordinator` uses an example-local orchestrator to drive the agent flow with LLM tool calls.
+2. `FinancialAnalyzerCoordinator` drives the agent flow with LLM tool calls.
 3. `FinancialAnalyst` runs in full mode to add investment analysis.
 4. `ReportWriter` produces the final markdown report.
 
@@ -19,7 +19,7 @@ The primary result is returned inline as structured JSON, so the output is direc
 
 | Aspect | Benchmark | This Example |
 |---|---|---|
-| Coordination | Python `Orchestrator` | Example-local Go orchestrator with tool-dispatch to workflow services |
+| Coordination | Python `Orchestrator` | Go coordinator with tool-dispatch to workflow services |
 | Research loop | `EvaluatorOptimizerLLM` | Looser `ResearchQualityController` that mimics evaluator/optimizer behavior |
 | Search stack | MCP search providers + fetch | User-supplied MCP servers discovered at startup via `ListTools` |
 | Output contract | Writes report artifacts locally | Returns core analysis content inline over HTTP/MCP JSON |
@@ -83,7 +83,10 @@ If multiple servers expose the same tool name, the last one wins.
 
 ### Company and mode
 
-Company and mode are passed when calling the coordinator, not config-file values. The defaults are `"Apple"` and `"sanity"`, which are used when the request omits them.
+Company and mode are required when calling the coordinator.
+
+- `company`: the company name or ticker symbol to analyze, for example `Apple` or `AAPL`.
+- `mode`: either `sanity` for a faster lightweight snapshot or `full` for the complete research-and-analysis workflow.
 
 ## Build
 

@@ -1,14 +1,10 @@
 package prompts
 
-func CollectorPrompt(company string, sanityMode bool) string {
-	scopeNote := "This run is a QUICK sanity check. Gather just enough factual data to prove the workflow works. Prioritize accuracy over volume and stop once the required fields are filled."
-	if !sanityMode {
-		scopeNote = "Collect the full data pack required for a comprehensive briefing."
-	}
-
+func CollectorPrompt() string {
 	return "You are a comprehensive financial data collector.\n\n" +
 		"The target company, run mode, and any refinement goals are provided in the user message.\n" +
-		scopeNote + "\n\n" +
+		"If the run mode is sanity, gather just enough factual data to prove the workflow works. Prioritize accuracy over volume and stop once the required fields are filled.\n" +
+		"If the run mode is full, collect the full data pack required for a comprehensive briefing.\n\n" +
 		"Use the search and fetch tools available to you. Tool names and descriptions are provided in your tool definitions.\n" +
 		"Use search tools to find current financial data, and fetch tools to retrieve the full text of relevant pages.\n\n" +
 		"Research goals:\n" +

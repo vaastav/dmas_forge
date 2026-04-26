@@ -9,11 +9,9 @@ import (
 )
 
 type ResearchQualityControllerImpl struct {
-	agent          core.Agent
-	collector      DataCollectorAgent
-	evaluator      DataEvaluatorAgent
-	defaultCompany string
-	defaultMode    string
+	agent     core.Agent
+	collector DataCollectorAgent
+	evaluator DataEvaluatorAgent
 }
 
 func NewResearchQualityControllerImpl(
@@ -21,21 +19,20 @@ func NewResearchQualityControllerImpl(
 	agent core.Agent,
 	collector DataCollectorAgent,
 	evaluator DataEvaluatorAgent,
-	company string,
-	mode string,
 ) (ResearchQualityController, error) {
+	_ = ctx
 	return &ResearchQualityControllerImpl{
-		agent:          agent,
-		collector:      collector,
-		evaluator:      evaluator,
-		defaultCompany: company,
-		defaultMode:    NormalizeMode(mode),
+		agent:     agent,
+		collector: collector,
+		evaluator: evaluator,
 	}, nil
 }
 
 func (c *ResearchQualityControllerImpl) RefineResearch(ctx context.Context, req ResearchRequest) (ResearchQualityResult, error) {
-	company := firstNonEmpty(req.Company, c.defaultCompany)
-	mode := NormalizeMode(firstNonEmpty(req.Mode, c.defaultMode))
+	company, mode, err := requireCompanyAndMode(req.Company, req.Mode)
+	if err != nil {
+		return ResearchQualityResult{}, err
+	}
 	minRating, maxRefinements := controllerThresholds(mode)
 
 	aggregate := ResearchQualityResult{}

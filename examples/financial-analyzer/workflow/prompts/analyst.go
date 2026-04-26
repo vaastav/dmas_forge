@@ -1,14 +1,10 @@
 package prompts
 
-func AnalystPrompt(company string, sanityMode bool) string {
-	scopeNote := "Keep this analysis brief and highlight only the strongest bullish and bearish takeaways supported by the research."
-	if !sanityMode {
-		scopeNote = "Provide a full investment analysis with clear bull/bear framing, valuation context, and risk discussion."
-	}
-
+func AnalystPrompt() string {
 	return "You are a senior financial analyst providing investment analysis.\n\n" +
 		"The target company, run mode, and verified research are provided in the user message.\n" +
-		scopeNote + "\n\n" +
+		"If the run mode is sanity, keep the analysis brief and highlight only the strongest bullish and bearish takeaways supported by the research.\n" +
+		"If the run mode is full, provide a full investment analysis with clear bull/bear framing, valuation context, and risk discussion.\n\n" +
 		"Requirements:\n" +
 		"- Base every conclusion on the provided research.\n" +
 		"- Use exact figures and percentages from the research when possible.\n" +

@@ -13,12 +13,10 @@ import (
 )
 
 type FinancialAnalyzerCoordinatorImpl struct {
-	orchestrator   *LocalOrchestrator
-	researchSvc    ResearchQualityController
-	analystSvc     FinancialAnalystAgent
-	writerSvc      ReportWriterAgent
-	defaultCompany string
-	defaultMode    string
+	agent       core.Agent
+	researchSvc ResearchQualityController
+	analystSvc  FinancialAnalystAgent
+	writerSvc   ReportWriterAgent
 }
 
 func NewFinancialAnalyzerCoordinatorImpl(
@@ -27,21 +25,29 @@ func NewFinancialAnalyzerCoordinatorImpl(
 	researchSvc ResearchQualityController,
 	analystSvc FinancialAnalystAgent,
 	writerSvc ReportWriterAgent,
-	company string,
-	mode string,
 ) (FinancialAnalyzerCoordinator, error) {
-	orchestrator, err := NewLocalOrchestrator(ctx, agent, coordinatorToolSchemas())
-	if err != nil {
-		return nil, err
+	sysPrompt := prompts.CoordinatorPrompt()
+
+	if err := agent.AddTools(ctx, coordinatorToolSchemas()); err != nil {
+		return nil, fmt.Errorf("adding coordinator tools: %w", err)
 	}
-	return &FinancialAnalyzerCoordinatorImpl{
-		orchestrator:   orchestrator,
-		researchSvc:    researchSvc,
-		analystSvc:     analystSvc,
-		writerSvc:      writerSvc,
-		defaultCompany: company,
-		defaultMode:    NormalizeMode(mode),
-	}, nil
+
+	a := &FinancialAnalyzerCoordinatorImpl{
+		agent:       agent,
+		researchSvc: researchSvc,
+		analystSvc:  analystSvc,
+		writerSvc:   writerSvc,
+	}
+
+	if err := agent.RegisterToolCallHandler(ctx, a.coordinatorHandler()); err != nil {
+		return nil, fmt.Errorf("registering coordinator handler: %w", err)
+	}
+
+	if err := agent.AddSystemPrompt(ctx, sysPrompt); err != nil {
+		return nil, fmt.Errorf("adding coordinator system prompt: %w", err)
+	}
+
+	return a, nil
 }
 
 const (
@@ -49,17 +55,17 @@ const (
 	fullModeTimeout   = 10 * time.Minute
 )
 
-func (a *FinancialAnalyzerCoordinatorImpl) Analyze(ctx context.Context, company string, mode string) (AnalysisResult, error) {
-	resolvedMode := NormalizeMode(firstNonEmpty(mode, a.defaultMode))
+func (a *FinancialAnalyzerCoordinatorImpl) Analyze(ctx context.Context, requestedCompany string, requestedMode string) (AnalysisResult, error) {
+	company, mode, err := requireCompanyAndMode(requestedCompany, requestedMode)
+	if err != nil {
+		return AnalysisResult{}, err
+	}
 	timeout := sanityModeTimeout
-	if resolvedMode == ModeFull {
+	if mode == ModeFull {
 		timeout = fullModeTimeout
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-
-	company = firstNonEmpty(company, a.defaultCompany)
-	mode = resolvedMode
 
 	result := &AnalysisResult{
 		Company: company,
@@ -67,12 +73,15 @@ func (a *FinancialAnalyzerCoordinatorImpl) Analyze(ctx context.Context, company 
 		RunID:   time.Now().UTC().Format("20060102_150405"),
 	}
 
-	handler := a.buildHandler(ctx, result, company, mode)
+	ctx = withFinancialRunState(ctx, &financialRunState{
+		Company: company,
+		Mode:    mode,
+		Result:  result,
+	})
 
-	systemPrompt := prompts.CoordinatorPrompt(company, IsSanityMode(mode))
 	taskPrompt := prompts.CoordinatorTask(company, IsSanityMode(mode))
 
-	output, err := a.orchestrator.Run(ctx, handler, systemPrompt, taskPrompt)
+	output, err := a.agent.LLMCallWithTools(ctx, taskPrompt)
 	if err != nil {
 		return AnalysisResult{}, err
 	}
@@ -88,22 +97,27 @@ func (a *FinancialAnalyzerCoordinatorImpl) Analyze(ctx context.Context, company 
 	return *result, nil
 }
 
-func (a *FinancialAnalyzerCoordinatorImpl) buildHandler(ctx context.Context, result *AnalysisResult, company, mode string) core.ToolHandlerFn {
+func (a *FinancialAnalyzerCoordinatorImpl) coordinatorHandler() core.ToolHandlerFn {
 	return func(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
 		switch tc.Function.Name {
 		case "run_research_quality_controller":
-			return a.handleResearchTool(ctx, tc, result, company, mode)
+			return a.handleResearchTool(ctx, tc)
 		case "run_financial_analyst":
-			return a.handleAnalystTool(ctx, tc, result, company, mode)
+			return a.handleAnalystTool(ctx, tc)
 		case "run_report_writer":
-			return a.handleReportTool(ctx, tc, result, company, mode)
+			return a.handleReportTool(ctx, tc)
 		default:
 			return "", fmt.Errorf("unknown tool: %s", tc.Function.Name)
 		}
 	}
 }
 
-func (a *FinancialAnalyzerCoordinatorImpl) handleResearchTool(ctx context.Context, tc openai.ChatCompletionMessageToolCall, result *AnalysisResult, company, mode string) (string, error) {
+func (a *FinancialAnalyzerCoordinatorImpl) handleResearchTool(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
+	state, err := financialRunStateFromContext(ctx)
+	if err != nil {
+		return "", err
+	}
+
 	var args struct {
 		Company string `json:"company"`
 		Mode    string `json:"mode"`
@@ -112,32 +126,35 @@ func (a *FinancialAnalyzerCoordinatorImpl) handleResearchTool(ctx context.Contex
 		return "", err
 	}
 
+	company := firstNonEmpty(args.Company, state.Company)
+	mode := firstNonEmpty(args.Mode, state.Mode)
+
 	res, err := a.researchSvc.RefineResearch(ctx, ResearchRequest{
-		Company: firstNonEmpty(args.Company, company),
-		Mode:    firstNonEmpty(args.Mode, mode),
+		Company: company,
+		Mode:    mode,
 	})
 	if err != nil {
-		return marshalJSON(map[string]interface{}{
-			"company": company,
-			"mode":    mode,
-			"ok":      false,
-			"error":   err.Error(),
-		})
+		return toolErrorJSON(err)
 	}
 
-	result.ResearchMarkdown = res.ResearchMarkdown
+	state.Result.ResearchMarkdown = res.ResearchMarkdown
 	return marshalJSON(map[string]interface{}{
 		"research_markdown": res.ResearchMarkdown,
 		"final_rating":      string(res.FinalRating),
 		"refinement_count":  res.RefinementCount,
-		"company":           firstNonEmpty(args.Company, company),
+		"company":           company,
 		"ok":                true,
 	})
 }
 
-func (a *FinancialAnalyzerCoordinatorImpl) handleAnalystTool(ctx context.Context, tc openai.ChatCompletionMessageToolCall, result *AnalysisResult, company, mode string) (string, error) {
-	if IsSanityMode(mode) {
-		return "", fmt.Errorf("financial_analyst tool is not available in sanity mode")
+func (a *FinancialAnalyzerCoordinatorImpl) handleAnalystTool(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
+	state, err := financialRunStateFromContext(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	if IsSanityMode(state.Mode) {
+		return toolErrorJSON(fmt.Errorf("financial_analyst tool is not available in sanity mode"))
 	}
 
 	var args struct {
@@ -149,28 +166,30 @@ func (a *FinancialAnalyzerCoordinatorImpl) handleAnalystTool(ctx context.Context
 		return "", err
 	}
 
-	research := firstNonEmpty(args.ResearchMarkdown, result.ResearchMarkdown)
+	research := firstNonEmpty(args.ResearchMarkdown, state.Result.ResearchMarkdown)
 	if strings.TrimSpace(research) == "" {
-		return marshalJSON(map[string]interface{}{
-			"ok":    false,
-			"error": "no research data available; run research_quality_controller first",
-		})
+		return toolErrorJSON(fmt.Errorf("no research data available; run research_quality_controller first"))
 	}
 
 	analysis, err := a.analystSvc.AnalyzeData(ctx, AnalysisRequest{
-		Company:          firstNonEmpty(args.Company, company),
-		Mode:             firstNonEmpty(args.Mode, mode),
+		Company:          firstNonEmpty(args.Company, state.Company),
+		Mode:             firstNonEmpty(args.Mode, state.Mode),
 		ResearchMarkdown: research,
 	})
+	if err != nil {
+		return toolErrorJSON(err)
+	}
+
+	state.Result.AnalysisMarkdown = analysis
+	return marshalJSON(map[string]string{"analysis_markdown": analysis})
+}
+
+func (a *FinancialAnalyzerCoordinatorImpl) handleReportTool(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
+	state, err := financialRunStateFromContext(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	result.AnalysisMarkdown = analysis
-	return marshalJSON(map[string]string{"analysis_markdown": analysis})
-}
-
-func (a *FinancialAnalyzerCoordinatorImpl) handleReportTool(ctx context.Context, tc openai.ChatCompletionMessageToolCall, result *AnalysisResult, company, mode string) (string, error) {
 	var args struct {
 		Company          string `json:"company"`
 		Mode             string `json:"mode"`
@@ -181,25 +200,22 @@ func (a *FinancialAnalyzerCoordinatorImpl) handleReportTool(ctx context.Context,
 		return "", err
 	}
 
-	research := firstNonEmpty(args.ResearchMarkdown, result.ResearchMarkdown)
+	research := firstNonEmpty(args.ResearchMarkdown, state.Result.ResearchMarkdown)
 	if strings.TrimSpace(research) == "" {
-		return marshalJSON(map[string]interface{}{
-			"ok":    false,
-			"error": "no research data available; run research_quality_controller first",
-		})
+		return toolErrorJSON(fmt.Errorf("no research data available; run research_quality_controller first"))
 	}
 
 	report, err := a.writerSvc.WriteReport(ctx, ReportRequest{
-		Company:          firstNonEmpty(args.Company, company),
-		Mode:             firstNonEmpty(args.Mode, mode),
+		Company:          firstNonEmpty(args.Company, state.Company),
+		Mode:             firstNonEmpty(args.Mode, state.Mode),
 		ResearchMarkdown: research,
-		AnalysisMarkdown: firstNonEmpty(args.AnalysisMarkdown, result.AnalysisMarkdown),
+		AnalysisMarkdown: firstNonEmpty(args.AnalysisMarkdown, state.Result.AnalysisMarkdown),
 	})
 	if err != nil {
-		return "", err
+		return toolErrorJSON(err)
 	}
 
-	result.ReportMarkdown = report
+	state.Result.ReportMarkdown = report
 	return marshalJSON(map[string]string{"report_markdown": report})
 }
 
@@ -208,43 +224,65 @@ func coordinatorToolSchemas() map[string]openai.ChatCompletionToolParam {
 		"run_research_quality_controller": simpleTool(
 			"run_research_quality_controller",
 			"Gather financial research, evaluate quality, and refine until the research reaches the required threshold.",
-			map[string]interface{}{"company": map[string]interface{}{"type": "string"}, "mode": map[string]interface{}{"type": "string"}},
+			map[string]toolProperty{
+				"company": {Type: "string", Description: "The company ticker or name to research."},
+				"mode":    {Type: "string", Description: "Analysis mode: 'sanity' for a quick check or 'full' for comprehensive research."},
+			},
 			[]string{"company", "mode"},
 		),
 		"run_financial_analyst": simpleTool(
 			"run_financial_analyst",
 			"Analyze verified research and produce investment analysis.",
-			map[string]interface{}{
-				"company":           map[string]interface{}{"type": "string"},
-				"mode":              map[string]interface{}{"type": "string"},
-				"research_markdown": map[string]interface{}{"type": "string"},
+			map[string]toolProperty{
+				"company":           {Type: "string", Description: "The company ticker or name to analyze."},
+				"mode":              {Type: "string", Description: "Analysis mode: 'sanity' or 'full'."},
+				"research_markdown": {Type: "string", Description: "The verified research markdown to analyze."},
 			},
 			[]string{"company", "mode", "research_markdown"},
 		),
 		"run_report_writer": simpleTool(
 			"run_report_writer",
 			"Generate the final markdown report from verified research and optional analyst notes.",
-			map[string]interface{}{
-				"company":           map[string]interface{}{"type": "string"},
-				"mode":              map[string]interface{}{"type": "string"},
-				"research_markdown": map[string]interface{}{"type": "string"},
-				"analysis_markdown": map[string]interface{}{"type": "string"},
+			map[string]toolProperty{
+				"company":           {Type: "string", Description: "The company ticker or name for the report."},
+				"mode":              {Type: "string", Description: "Report mode: 'sanity' or 'full'."},
+				"research_markdown": {Type: "string", Description: "The verified research markdown to include."},
+				"analysis_markdown": {Type: "string", Description: "Optional analyst notes to incorporate."},
 			},
 			[]string{"company", "mode", "research_markdown", "analysis_markdown"},
 		),
 	}
 }
 
-func simpleTool(name, description string, properties map[string]interface{}, required []string) openai.ChatCompletionToolParam {
+type toolProperty struct {
+	Type        string
+	Description string
+}
+
+func simpleTool(name, description string, properties map[string]toolProperty, required []string) openai.ChatCompletionToolParam {
+	props := make(map[string]interface{}, len(properties))
+	for k, v := range properties {
+		props[k] = map[string]interface{}{
+			"type":        v.Type,
+			"description": v.Description,
+		}
+	}
 	return openai.ChatCompletionToolParam{
 		Function: openai.FunctionDefinitionParam{
 			Name:        name,
 			Description: openai.String(description),
 			Parameters: openai.FunctionParameters{
 				"type":       "object",
-				"properties": properties,
+				"properties": props,
 				"required":   required,
 			},
 		},
 	}
+}
+
+func toolErrorJSON(err error) (string, error) {
+	return marshalJSON(map[string]interface{}{
+		"ok":    false,
+		"error": err.Error(),
+	})
 }

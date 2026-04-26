@@ -2,18 +2,27 @@ package prompts
 
 import (
 	"fmt"
-	"time"
+	"strings"
 )
 
-func ReportPrompt(company string, sanityMode bool) string {
-	reportDate := time.Now().Format("January 02, 2006 at 3:04 PM MST")
-	if sanityMode {
-		return sanityModePrompt(company, reportDate)
-	}
-	return fullModePrompt(company, reportDate)
+func ReportPrompt() string {
+	return `Create a financial report from the company, run mode, report date, verified research, and optional analyst notes provided in the user message.
+
+Rules:
+- Return markdown only.
+- Use only facts supported by the supplied research.
+- Do not invent unsupported claims or sources.
+- Use exact figures and dates from the supplied research when available.`
 }
 
-func sanityModePrompt(company, reportDate string) string {
+func ReportTask(company, mode, reportDate, researchMarkdown, analysisMarkdown string) string {
+	if strings.TrimSpace(mode) == "full" {
+		return fullModeTask(company, reportDate, researchMarkdown, analysisMarkdown)
+	}
+	return sanityModeTask(company, reportDate, researchMarkdown, analysisMarkdown)
+}
+
+func sanityModeTask(company, reportDate, researchMarkdown, analysisMarkdown string) string {
 	return fmt.Sprintf(`Create a concise, sanity-check markdown snapshot.
 
 The user message provides the target company plus the verified research and optional analyst notes.
@@ -43,10 +52,18 @@ Rules:
 - Return markdown only.
 - Keep the entire document under 400 words.
 - Use only facts supported by the supplied research.
-- End with a one-sentence overall assessment and confidence level.`, company, reportDate)
+- End with a one-sentence overall assessment and confidence level.
+
+Verified research:
+
+%s
+
+Optional analyst notes:
+
+%s`, company, reportDate, researchMarkdown, optionalMarkdown(analysisMarkdown))
 }
 
-func fullModePrompt(company, reportDate string) string {
+func fullModeTask(company, reportDate, researchMarkdown, analysisMarkdown string) string {
 	return fmt.Sprintf(`Create a comprehensive, institutional-quality financial report.
 
 The user message provides the target company, verified research, and analyst output.
@@ -135,5 +152,20 @@ Rules:
 - Return markdown only.
 - Use exact figures and dates from the supplied research.
 - Do not invent unsupported claims or sources.
-- Keep the tone professional and objective.`, company, reportDate)
+- Keep the tone professional and objective.
+
+Verified research:
+
+%s
+
+Analyst output:
+
+%s`, company, reportDate, researchMarkdown, optionalMarkdown(analysisMarkdown))
+}
+
+func optionalMarkdown(markdown string) string {
+	if strings.TrimSpace(markdown) == "" {
+		return "(none)"
+	}
+	return markdown
 }

@@ -13,11 +13,6 @@ import (
 
 var mcpServers = flag.String("mcp-servers", "http://localhost:8080", "Comma-separated list of MCP server URLs for search/fetch tools")
 
-const (
-	defaultCompany = "Apple"
-	defaultMode    = "sanity"
-)
-
 type financialServices struct {
 	collectorService   string
 	evaluatorService   string
@@ -33,8 +28,6 @@ func defineFinancialServices(spec wiring.WiringSpec) (financialServices, error) 
 		return financialServices{}, err
 	}
 
-	company := defaultCompany
-	mode := wf.NormalizeMode(defaultMode)
 	mcpServerURLs := *mcpServers
 
 	collectorCore := openai_plugin.OpenAILLMAgent(spec, "collector_core", minfo.URL, minfo.Key, minfo.Name, openai_plugin.AgentConfig{})
@@ -45,11 +38,11 @@ func defineFinancialServices(spec wiring.WiringSpec) (financialServices, error) 
 	researcherCore := openai_plugin.OpenAILLMAgent(spec, "researcher_core", minfo.URL, minfo.Key, minfo.Name, openai_plugin.AgentConfig{})
 
 	services := financialServices{}
-	services.collectorService = workflow.Service[wf.DataCollectorAgent](spec, "collector_service", collectorCore, mcpServerURLs, company, mode)
-	services.evaluatorService = workflow.Service[wf.DataEvaluatorAgent](spec, "evaluator_service", evaluatorCore, company, mode)
-	services.researchService = workflow.Service[wf.ResearchQualityController](spec, "research_quality_service", researcherCore, services.collectorService, services.evaluatorService, company, mode)
-	services.analystService = workflow.Service[wf.FinancialAnalystAgent](spec, "analyst_service", analystCore, company, mode)
-	services.writerService = workflow.Service[wf.ReportWriterAgent](spec, "writer_service", writerCore, company, mode)
+	services.collectorService = workflow.Service[wf.DataCollectorAgent](spec, "collector_service", collectorCore, mcpServerURLs)
+	services.evaluatorService = workflow.Service[wf.DataEvaluatorAgent](spec, "evaluator_service", evaluatorCore)
+	services.researchService = workflow.Service[wf.ResearchQualityController](spec, "research_quality_service", researcherCore, services.collectorService, services.evaluatorService)
+	services.analystService = workflow.Service[wf.FinancialAnalystAgent](spec, "analyst_service", analystCore)
+	services.writerService = workflow.Service[wf.ReportWriterAgent](spec, "writer_service", writerCore)
 	services.coordinatorService = workflow.Service[wf.FinancialAnalyzerCoordinator](
 		spec,
 		"coordinator_service",
@@ -57,8 +50,6 @@ func defineFinancialServices(spec wiring.WiringSpec) (financialServices, error) 
 		services.researchService,
 		services.analystService,
 		services.writerService,
-		company,
-		mode,
 	)
 
 	return services, nil
