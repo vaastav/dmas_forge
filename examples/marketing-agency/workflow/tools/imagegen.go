@@ -16,8 +16,8 @@ import (
 
 // ImageGenTool returns the OpenAI function-calling tool definition for
 // generate_image.  The LLM supplies a prompt and receives a short status
-// confirmation; the actual image bytes are captured out-of-band via the
-// shared buffer passed to ImageGenHandler.
+// confirmation; the actual image bytes are captured out-of-band via a
+// per-request buffer read by ImageGenHandler from the call context.
 func ImageGenTool() openai.ChatCompletionToolParam {
 	return openai.ChatCompletionToolParam{
 		Function: openai.FunctionDefinitionParam{
@@ -39,9 +39,10 @@ func ImageGenTool() openai.ChatCompletionToolParam {
 
 // ImageGenHandler returns a tool handler that calls the DALL-E API,
 // converts the resulting PNG to JPEG, and stores the compressed bytes in
-// dst.  The string returned to the LLM is a brief status message — the
-// image data never flows through the LLM context.
-func ImageGenHandler(client *openai.Client, dst *[]byte) core.ToolHandlerFn {
+// a per-request buffer found on the context. The string returned to the
+// LLM is a brief status message — the image data never flows through the
+// LLM context.
+func ImageGenHandler(client *openai.Client) core.ToolHandlerFn {
 	return func(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
 		if tc.Function.Name != "generate_image" {
 			return "", fmt.Errorf("unsupported tool: %s", tc.Function.Name)
@@ -62,6 +63,10 @@ func ImageGenHandler(client *openai.Client, dst *[]byte) core.ToolHandlerFn {
 			return "", err
 		}
 
+		dst, err := imageOutputFromContext(ctx)
+		if err != nil {
+			return "", err
+		}
 		*dst = jpegBytes
 
 		return `{"status":"success"}`, nil

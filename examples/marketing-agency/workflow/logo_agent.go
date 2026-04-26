@@ -19,13 +19,11 @@ Task:
 `
 
 type LogoAgentImpl struct {
-	agent     core.Agent
-	imageData *[]byte // populated by ImageGenHandler during tool call
+	agent core.Agent
 }
 
 func NewLogoAgentImpl(ctx context.Context, agent core.Agent, apiKey, baseURL string) (LogoAgent, error) {
-	imageData := new([]byte)
-	a := &LogoAgentImpl{agent: agent, imageData: imageData}
+	a := &LogoAgentImpl{agent: agent}
 	client := openai.NewClient(option.WithAPIKey(apiKey), option.WithBaseURL(baseURL))
 
 	if err := a.agent.AddSystemPrompt(ctx, logoAgentPrompt); err != nil {
@@ -38,7 +36,7 @@ func NewLogoAgentImpl(ctx context.Context, agent core.Agent, apiKey, baseURL str
 		return nil, err
 	}
 
-	if err := a.agent.RegisterToolCallHandler(ctx, tools.ImageGenHandler(&client, imageData)); err != nil {
+	if err := a.agent.RegisterToolCallHandler(ctx, tools.ImageGenHandler(&client)); err != nil {
 		return nil, err
 	}
 
@@ -46,6 +44,9 @@ func NewLogoAgentImpl(ctx context.Context, agent core.Agent, apiKey, baseURL str
 }
 
 func (a *LogoAgentImpl) GenerateLogo(ctx context.Context, brandName, style string) ([]byte, error) {
+	imageData := []byte(nil)
+	ctx = tools.WithImageOutput(ctx, &imageData)
+
 	query := fmt.Sprintf(
 		"Brand: %s\\nStyle: %s\\nUse generate_image to create a logo.",
 		brandName,
@@ -56,11 +57,9 @@ func (a *LogoAgentImpl) GenerateLogo(ctx context.Context, brandName, style strin
 		return nil, err
 	}
 
-	if len(*a.imageData) == 0 {
+	if len(imageData) == 0 {
 		return nil, fmt.Errorf("logo agent did not produce image data")
 	}
 
-	data := *a.imageData
-	*a.imageData = nil // reset for next call
-	return data, nil
+	return imageData, nil
 }
