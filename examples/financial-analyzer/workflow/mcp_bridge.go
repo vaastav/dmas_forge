@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	openai "github.com/openai/openai-go"
@@ -16,6 +17,7 @@ type MCPToolBridge struct {
 	sessions  []*mcp.ClientSession
 	toolToIdx map[string]int
 	tools     map[string]openai.ChatCompletionToolParam
+	callMu    sync.Mutex
 }
 
 func NewMCPToolBridge(ctx context.Context, serverURLs []string) (*MCPToolBridge, error) {
@@ -47,14 +49,15 @@ func NewMCPToolBridge(ctx context.Context, serverURLs []string) (*MCPToolBridge,
 			continue
 		}
 
-		idx := len(b.sessions)
-		b.sessions = append(b.sessions, session)
-
 		result, err := session.ListTools(ctx, nil)
 		if err != nil {
 			log.Printf("MCP bridge: failed to list tools from %s: %v", url, err)
+			_ = session.Close()
 			continue
 		}
+
+		idx := len(b.sessions)
+		b.sessions = append(b.sessions, session)
 
 		for _, tool := range result.Tools {
 			if _, exists := b.toolToIdx[tool.Name]; exists {
@@ -71,6 +74,9 @@ func NewMCPToolBridge(ctx context.Context, serverURLs []string) (*MCPToolBridge,
 	}
 
 	if len(b.tools) == 0 {
+		for _, session := range b.sessions {
+			_ = session.Close()
+		}
 		return nil, fmt.Errorf("no tools discovered from any MCP server")
 	}
 
@@ -98,10 +104,12 @@ func (b *MCPToolBridge) HandleToolCall(ctx context.Context, tc openai.ChatComple
 		args = make(map[string]any)
 	}
 
+	b.callMu.Lock()
 	result, err := b.sessions[idx].CallTool(ctx, &mcp.CallToolParams{
 		Name:      tc.Function.Name,
 		Arguments: args,
 	})
+	b.callMu.Unlock()
 	if err != nil {
 		return fmt.Sprintf("Error calling MCP tool %q: %v", tc.Function.Name, err), nil
 	}
