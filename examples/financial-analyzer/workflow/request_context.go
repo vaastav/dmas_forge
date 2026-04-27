@@ -28,16 +28,20 @@ func financialRunStateFromContext(ctx context.Context) (*financialRunState, erro
 
 func requireCompanyAndMode(company, mode string) (string, string, error) {
 	company = strings.TrimSpace(company)
+	mode = strings.TrimSpace(mode)
+
+	validationErrors := []string{}
+
 	if company == "" {
-		return "", "", fmt.Errorf("company is required")
+		validationErrors = append(validationErrors, "\"company\" must be provided and cannot be empty.")
 	}
 
-	mode = strings.TrimSpace(mode)
-	if mode == "" {
-		return "", "", fmt.Errorf("mode is required")
+	if mode == "" || (mode != ModeSanity && mode != ModeFull) {
+		validationErrors = append(validationErrors, "\"mode\" must be provided as \"sanity\" or \"full\".")
 	}
-	if mode != ModeSanity && mode != ModeFull {
-		return "", "", fmt.Errorf("mode must be either %q or %q", ModeSanity, ModeFull)
+
+	if len(validationErrors) > 0 {
+		return "", "", fmt.Errorf("invalid request: %s", strings.Join(validationErrors, " "))
 	}
 
 	return company, mode, nil
