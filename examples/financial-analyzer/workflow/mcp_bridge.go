@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	openai "github.com/openai/openai-go"
@@ -17,7 +16,6 @@ type MCPToolBridge struct {
 	sessions  []*mcp.ClientSession
 	toolToIdx map[string]int
 	tools     map[string]openai.ChatCompletionToolParam
-	callMu    sync.Mutex
 }
 
 func NewMCPToolBridge(ctx context.Context, serverURLs []string) (*MCPToolBridge, error) {
@@ -104,12 +102,10 @@ func (b *MCPToolBridge) HandleToolCall(ctx context.Context, tc openai.ChatComple
 		args = make(map[string]any)
 	}
 
-	b.callMu.Lock()
 	result, err := b.sessions[idx].CallTool(ctx, &mcp.CallToolParams{
 		Name:      tc.Function.Name,
 		Arguments: args,
 	})
-	b.callMu.Unlock()
 	if err != nil {
 		return fmt.Sprintf("Error calling MCP tool %q: %v", tc.Function.Name, err), nil
 	}

@@ -81,6 +81,8 @@ The `-mcp-servers` flag accepts one or more URLs:
 
 If multiple servers expose the same tool name, the last one wins.
 
+This example assumes each external MCP server can handle concurrent or multiplexed requests on the long-lived session the bridge opens at startup.
+
 ### Company and mode
 
 Company and mode are required when calling the coordinator.
