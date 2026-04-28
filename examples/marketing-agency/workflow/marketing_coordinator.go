@@ -239,7 +239,7 @@ func (a *MarketingCoordinatorImpl) handleMarketingTool(ctx context.Context, tc o
 		return "", err
 	}
 
-	return marshalJSON(map[string]interface{}{"strategy_markdown": strategy})
+	return marshalJSON(map[string]interface{}{"marketing_strategy": strategy})
 }
 
 func (a *MarketingCoordinatorImpl) handleLogoTool(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
