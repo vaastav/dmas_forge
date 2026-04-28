@@ -15,7 +15,7 @@ const logoAgentPrompt = `You are a brand designer.
 Task:
 - Create a strong logo generation prompt from brand context.
 - Use generate_image tool exactly once.
-- After the tool succeeds, reply with exactly: done
+- After the tool succeeds, return only the JSON metadata from the tool.
 `
 
 type LogoAgentImpl struct {
@@ -43,23 +43,17 @@ func NewLogoAgentImpl(ctx context.Context, agent core.Agent, apiKey, baseURL str
 	return a, nil
 }
 
-func (a *LogoAgentImpl) GenerateLogo(ctx context.Context, brandName, style string) ([]byte, error) {
-	imageData := []byte(nil)
-	ctx = tools.WithImageOutput(ctx, &imageData)
-
+func (a *LogoAgentImpl) GenerateLogo(ctx context.Context, brandName, style string) (string, error) {
 	query := fmt.Sprintf(
-		"Brand: %s\\nStyle: %s\\nUse generate_image to create a logo.",
+		"Brand: %s\\nStyle: %s\\nUse generate_image to create a logo. Return only the tool's JSON metadata.",
 		brandName,
 		style,
 	)
 
-	if _, err := a.agent.LLMCallWithTools(ctx, query); err != nil {
-		return nil, err
+	output, err := a.agent.LLMCallWithTools(ctx, query)
+	if err != nil {
+		return "", err
 	}
 
-	if len(imageData) == 0 {
-		return nil, fmt.Errorf("logo agent did not produce image data")
-	}
-
-	return imageData, nil
+	return output, nil
 }

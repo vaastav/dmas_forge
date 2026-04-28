@@ -9,7 +9,7 @@ The coordinator orchestrates four specialized agents:
 - `DomainAgent`: suggests candidate domains using DuckDuckGo search.
 - `WebsiteAgent`: asks the LLM for a compact file plan, then generates each planned file sequentially.
 - `MarketingAgent`: generates a full marketing strategy document.
-- `LogoAgent`: generates a logo image via OpenAI images API and returns it inline as JPEG.
+- `LogoAgent`: generates a logo image via OpenAI images API, saves it locally, and returns file metadata.
 
 ## Architecture
 
@@ -100,5 +100,5 @@ Expected response contains a `Ret0` object with:
 - `selected_domain`
 - `website_files`
 - `marketing_strategy`
-- `logo_jpeg` (base64-encoded JPEG image)
+- `logo_path`
 - `summary`
