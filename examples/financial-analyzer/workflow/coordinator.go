@@ -73,12 +73,6 @@ func (a *FinancialAnalyzerCoordinatorImpl) Analyze(ctx context.Context, requeste
 		RunID:   time.Now().UTC().Format("20060102_150405"),
 	}
 
-	ctx = withFinancialRunState(ctx, &financialRunState{
-		Company: company,
-		Mode:    mode,
-		Result:  result,
-	})
-
 	taskPrompt := prompts.CoordinatorTask(company, IsSanityMode(mode))
 
 	output, err := a.agent.LLMCallWithTools(ctx, taskPrompt)
@@ -86,12 +80,17 @@ func (a *FinancialAnalyzerCoordinatorImpl) Analyze(ctx context.Context, requeste
 		return AnalysisResult{}, err
 	}
 
-	if strings.TrimSpace(result.ReportMarkdown) == "" {
-		if strings.TrimSpace(output) != "" {
-			result.ReportMarkdown = output
-		} else {
-			return AnalysisResult{}, fmt.Errorf("orchestrator finished without producing a report")
-		}
+	if parsed, err := parseAnalysisResult(output); err == nil {
+		parsed.Company = firstNonEmpty(parsed.Company, company)
+		parsed.Mode = firstNonEmpty(parsed.Mode, mode)
+		parsed.RunID = firstNonEmpty(parsed.RunID, result.RunID)
+		return parsed, nil
+	}
+
+	if strings.TrimSpace(output) != "" {
+		result.ReportMarkdown = output
+	} else {
+		return AnalysisResult{}, fmt.Errorf("orchestrator finished without producing a report")
 	}
 
 	return *result, nil
@@ -100,11 +99,11 @@ func (a *FinancialAnalyzerCoordinatorImpl) Analyze(ctx context.Context, requeste
 func (a *FinancialAnalyzerCoordinatorImpl) coordinatorHandler() core.ToolHandlerFn {
 	return func(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
 		switch tc.Function.Name {
-		case "run_research_quality_controller":
+		case "research_quality_controller":
 			return a.handleResearchTool(ctx, tc)
-		case "run_financial_analyst":
+		case "financial_analyst":
 			return a.handleAnalystTool(ctx, tc)
-		case "run_report_writer":
+		case "report_writer":
 			return a.handleReportTool(ctx, tc)
 		default:
 			return "", fmt.Errorf("unknown tool: %s", tc.Function.Name)
@@ -113,11 +112,6 @@ func (a *FinancialAnalyzerCoordinatorImpl) coordinatorHandler() core.ToolHandler
 }
 
 func (a *FinancialAnalyzerCoordinatorImpl) handleResearchTool(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
-	state, err := financialRunStateFromContext(ctx)
-	if err != nil {
-		return "", err
-	}
-
 	var args struct {
 		Company string `json:"company"`
 		Mode    string `json:"mode"`
@@ -126,37 +120,25 @@ func (a *FinancialAnalyzerCoordinatorImpl) handleResearchTool(ctx context.Contex
 		return "", err
 	}
 
-	company := firstNonEmpty(args.Company, state.Company)
-	mode := firstNonEmpty(args.Mode, state.Mode)
-
 	res, err := a.researchSvc.RefineResearch(ctx, ResearchRequest{
-		Company: company,
-		Mode:    mode,
+		Company: args.Company,
+		Mode:    args.Mode,
 	})
 	if err != nil {
 		return toolErrorJSON(err)
 	}
 
-	state.Result.ResearchMarkdown = res.ResearchMarkdown
 	return marshalJSON(map[string]interface{}{
 		"research_markdown": res.ResearchMarkdown,
 		"final_rating":      string(res.FinalRating),
 		"refinement_count":  res.RefinementCount,
-		"company":           company,
+		"company":           args.Company,
+		"mode":              args.Mode,
 		"ok":                true,
 	})
 }
 
 func (a *FinancialAnalyzerCoordinatorImpl) handleAnalystTool(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
-	state, err := financialRunStateFromContext(ctx)
-	if err != nil {
-		return "", err
-	}
-
-	if IsSanityMode(state.Mode) {
-		return toolErrorJSON(fmt.Errorf("financial_analyst tool is not available in sanity mode"))
-	}
-
 	var args struct {
 		Company          string `json:"company"`
 		Mode             string `json:"mode"`
@@ -166,30 +148,19 @@ func (a *FinancialAnalyzerCoordinatorImpl) handleAnalystTool(ctx context.Context
 		return "", err
 	}
 
-	research := firstNonEmpty(args.ResearchMarkdown, state.Result.ResearchMarkdown)
-	if strings.TrimSpace(research) == "" {
-		return toolErrorJSON(fmt.Errorf("no research data available; run research_quality_controller first"))
-	}
-
 	analysis, err := a.analystSvc.AnalyzeData(ctx, AnalysisRequest{
-		Company:          firstNonEmpty(args.Company, state.Company),
-		Mode:             firstNonEmpty(args.Mode, state.Mode),
-		ResearchMarkdown: research,
+		Company:          args.Company,
+		Mode:             args.Mode,
+		ResearchMarkdown: args.ResearchMarkdown,
 	})
 	if err != nil {
 		return toolErrorJSON(err)
 	}
 
-	state.Result.AnalysisMarkdown = analysis
 	return marshalJSON(map[string]string{"analysis_markdown": analysis})
 }
 
 func (a *FinancialAnalyzerCoordinatorImpl) handleReportTool(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
-	state, err := financialRunStateFromContext(ctx)
-	if err != nil {
-		return "", err
-	}
-
 	var args struct {
 		Company          string `json:"company"`
 		Mode             string `json:"mode"`
@@ -200,81 +171,76 @@ func (a *FinancialAnalyzerCoordinatorImpl) handleReportTool(ctx context.Context,
 		return "", err
 	}
 
-	research := firstNonEmpty(args.ResearchMarkdown, state.Result.ResearchMarkdown)
-	if strings.TrimSpace(research) == "" {
-		return toolErrorJSON(fmt.Errorf("no research data available; run research_quality_controller first"))
-	}
-
 	report, err := a.writerSvc.WriteReport(ctx, ReportRequest{
-		Company:          firstNonEmpty(args.Company, state.Company),
-		Mode:             firstNonEmpty(args.Mode, state.Mode),
-		ResearchMarkdown: research,
-		AnalysisMarkdown: firstNonEmpty(args.AnalysisMarkdown, state.Result.AnalysisMarkdown),
+		Company:          args.Company,
+		Mode:             args.Mode,
+		ResearchMarkdown: args.ResearchMarkdown,
+		AnalysisMarkdown: args.AnalysisMarkdown,
 	})
 	if err != nil {
 		return toolErrorJSON(err)
 	}
 
-	state.Result.ReportMarkdown = report
 	return marshalJSON(map[string]string{"report_markdown": report})
 }
 
 func coordinatorToolSchemas() map[string]openai.ChatCompletionToolParam {
 	return map[string]openai.ChatCompletionToolParam{
-		"run_research_quality_controller": simpleTool(
-			"run_research_quality_controller",
-			"Gather financial research, evaluate quality, and refine until the research reaches the required threshold.",
-			map[string]toolProperty{
-				"company": {Type: "string", Description: "The company ticker or name to research."},
-				"mode":    {Type: "string", Description: "Analysis mode: 'sanity' for a quick check or 'full' for comprehensive research."},
-			},
-			[]string{"company", "mode"},
-		),
-		"run_financial_analyst": simpleTool(
-			"run_financial_analyst",
-			"Analyze verified research and produce investment analysis.",
-			map[string]toolProperty{
-				"company":           {Type: "string", Description: "The company ticker or name to analyze."},
-				"mode":              {Type: "string", Description: "Analysis mode: 'sanity' or 'full'."},
-				"research_markdown": {Type: "string", Description: "The verified research markdown to analyze."},
-			},
-			[]string{"company", "mode", "research_markdown"},
-		),
-		"run_report_writer": simpleTool(
-			"run_report_writer",
-			"Generate the final markdown report from verified research and optional analyst notes.",
-			map[string]toolProperty{
-				"company":           {Type: "string", Description: "The company ticker or name for the report."},
-				"mode":              {Type: "string", Description: "Report mode: 'sanity' or 'full'."},
-				"research_markdown": {Type: "string", Description: "The verified research markdown to include."},
-				"analysis_markdown": {Type: "string", Description: "Optional analyst notes to incorporate."},
-			},
-			[]string{"company", "mode", "research_markdown", "analysis_markdown"},
-		),
+		"research_quality_controller": researchToolSchema(),
+		"financial_analyst":           analystToolSchema(),
+		"report_writer":               reportToolSchema(),
 	}
 }
 
-type toolProperty struct {
-	Type        string
-	Description string
-}
-
-func simpleTool(name, description string, properties map[string]toolProperty, required []string) openai.ChatCompletionToolParam {
-	props := make(map[string]interface{}, len(properties))
-	for k, v := range properties {
-		props[k] = map[string]interface{}{
-			"type":        v.Type,
-			"description": v.Description,
-		}
-	}
+func researchToolSchema() openai.ChatCompletionToolParam {
 	return openai.ChatCompletionToolParam{
 		Function: openai.FunctionDefinitionParam{
-			Name:        name,
-			Description: openai.String(description),
+			Name:        "research_quality_controller",
+			Description: openai.String("Gather financial research, evaluate quality, and refine until the research reaches the required threshold."),
 			Parameters: openai.FunctionParameters{
-				"type":       "object",
-				"properties": props,
-				"required":   required,
+				"type": "object",
+				"properties": map[string]interface{}{
+					"company": map[string]interface{}{"type": "string", "description": "The company ticker or name to research."},
+					"mode":    map[string]interface{}{"type": "string", "description": "Analysis mode: 'sanity' for a quick check or 'full' for comprehensive research."},
+				},
+				"required": []string{"company", "mode"},
+			},
+		},
+	}
+}
+
+func analystToolSchema() openai.ChatCompletionToolParam {
+	return openai.ChatCompletionToolParam{
+		Function: openai.FunctionDefinitionParam{
+			Name:        "financial_analyst",
+			Description: openai.String("Analyze verified research and produce investment analysis."),
+			Parameters: openai.FunctionParameters{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"company":           map[string]interface{}{"type": "string", "description": "The company ticker or name to analyze."},
+					"mode":              map[string]interface{}{"type": "string", "description": "Analysis mode: 'sanity' or 'full'."},
+					"research_markdown": map[string]interface{}{"type": "string", "description": "The verified research markdown to analyze."},
+				},
+				"required": []string{"company", "mode", "research_markdown"},
+			},
+		},
+	}
+}
+
+func reportToolSchema() openai.ChatCompletionToolParam {
+	return openai.ChatCompletionToolParam{
+		Function: openai.FunctionDefinitionParam{
+			Name:        "report_writer",
+			Description: openai.String("Generate the final markdown report from verified research and optional analyst notes."),
+			Parameters: openai.FunctionParameters{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"company":           map[string]interface{}{"type": "string", "description": "The company ticker or name for the report."},
+					"mode":              map[string]interface{}{"type": "string", "description": "Report mode: 'sanity' or 'full'."},
+					"research_markdown": map[string]interface{}{"type": "string", "description": "The verified research markdown to include."},
+					"analysis_markdown": map[string]interface{}{"type": "string", "description": "Optional analyst notes to incorporate."},
+				},
+				"required": []string{"company", "mode", "research_markdown"},
 			},
 		},
 	}
@@ -285,4 +251,15 @@ func toolErrorJSON(err error) (string, error) {
 		"ok":    false,
 		"error": err.Error(),
 	})
+}
+
+func parseAnalysisResult(output string) (AnalysisResult, error) {
+	var result AnalysisResult
+	if !unmarshalJSONFromLLMResponse(output, &result) {
+		return AnalysisResult{}, fmt.Errorf("invalid analysis result JSON")
+	}
+	if strings.TrimSpace(result.ReportMarkdown) == "" {
+		return AnalysisResult{}, fmt.Errorf("missing report_markdown")
+	}
+	return result, nil
 }
