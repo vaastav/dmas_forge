@@ -4,43 +4,37 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
 	"github.com/vaastav/agentic_blueprint/examples/financial-analyzer/workflow/prompts"
 )
 
 type ReportWriterAgentImpl struct {
-	agent          core.Agent
-	defaultCompany string
-	defaultMode    string
+	agent core.Agent
 }
 
-func NewReportWriterAgentImpl(ctx context.Context, agent core.Agent, company string, mode string) (ReportWriterAgent, error) {
+func NewReportWriterAgentImpl(ctx context.Context, agent core.Agent) (ReportWriterAgent, error) {
+	sysPrompt := prompts.ReportPrompt()
+	if err := agent.AddSystemPrompt(ctx, sysPrompt); err != nil {
+		return nil, fmt.Errorf("adding report writer system prompt: %w", err)
+	}
+
 	return &ReportWriterAgentImpl{
-		agent:          agent,
-		defaultCompany: company,
-		defaultMode:    NormalizeMode(mode),
+		agent: agent,
 	}, nil
 }
 
 func (a *ReportWriterAgentImpl) WriteReport(ctx context.Context, req ReportRequest) (string, error) {
-	company := firstNonEmpty(req.Company, a.defaultCompany)
-	mode := NormalizeMode(firstNonEmpty(req.Mode, a.defaultMode))
-
-	if err := a.agent.AddSystemPrompt(ctx, prompts.ReportPrompt(company, IsSanityMode(mode))); err != nil {
+	company, mode, err := requireCompanyAndMode(req.Company, req.Mode)
+	if err != nil {
 		return "", err
 	}
 
-	var input strings.Builder
-	input.WriteString(fmt.Sprintf("Target company: %s\nRun mode: %s\n\n", company, mode))
-	input.WriteString("Verified research:\n\n")
-	input.WriteString(req.ResearchMarkdown)
-	if strings.TrimSpace(req.AnalysisMarkdown) != "" {
-		input.WriteString("\n\nFinancial analysis:\n\n")
-		input.WriteString(req.AnalysisMarkdown)
-	}
+	reportDate := time.Now().Format("January 02, 2006 at 3:04 PM MST")
+	input := prompts.ReportTask(company, mode, reportDate, req.ResearchMarkdown, req.AnalysisMarkdown)
 
-	report, err := a.agent.LLMCall(ctx, input.String())
+	report, err := a.agent.LLMCall(ctx, input)
 	if err != nil {
 		return "", err
 	}

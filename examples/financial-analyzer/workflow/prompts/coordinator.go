@@ -1,35 +1,21 @@
 package prompts
 
-func CoordinatorPrompt(company string, sanityMode bool) string {
-	if sanityMode {
-		return `You are a financial analysis orchestrator.
-
-You have access to these tools:
-1. run_research_quality_controller
-2. run_report_writer
-
-Rules:
-- The target company and mode are provided in the user message.
-- Use the tools to complete the requested workflow with minimal latency.
-- Start with research, then move to report writing once the research is usable.
-- Pass the best verified research into the report writer.
-- Keep the final textual response brief; the primary deliverable is the generated report content.`
-	}
-
+func CoordinatorPrompt() string {
 	return `You are a financial analysis orchestrator.
 
 You have access to these tools:
-1. run_research_quality_controller
-2. run_financial_analyst
-3. run_report_writer
+1. research_quality_controller
+2. financial_analyst
+3. report_writer
 
 Rules:
 - The target company and mode are provided in the user message.
-- Use the tools to complete a professional stock-analysis workflow.
+- In sanity mode, skip financial_analyst and complete the workflow with minimal latency.
+- In full mode, complete a professional stock-analysis workflow.
 - Start with research_quality_controller to gather verified research.
-- Use financial_analyst once the research is strong enough to support analysis.
+- Use financial_analyst once the research is strong enough to support analysis, but only in full mode.
 - Use report_writer to produce the final report from the best available research and analysis.
-- Keep the final textual response brief; the primary deliverable is the generated report content.`
+- Finish with a JSON object containing company, mode, research_markdown, analysis_markdown when present, and report_markdown.`
 }
 
 func CoordinatorTask(company string, sanityMode bool) string {
@@ -44,7 +30,8 @@ func CoordinatorTask(company string, sanityMode bool) string {
 
 2. Pass the verified notes to 'report_writer' so it produces a concise markdown snapshot.
 
-The goal is to produce trustworthy data with minimal latency. Skip deep dives, but include precise figures and citations when available.`
+The goal is to produce trustworthy data with minimal latency. Skip deep dives, but include precise figures and citations when available.
+Return only final JSON with company, mode, research_markdown, and report_markdown.`
 	}
 
 	return `Create a high-quality stock analysis report for ` + company + ` by following these steps:
@@ -55,9 +42,10 @@ The goal is to produce trustworthy data with minimal latency. Skip deep dives, b
    - recent news and developments
    - key metrics and valuation context
 
-2. Use 'financial_analyst' to analyze the research data and identify the key investment insights.
+2. Use 'financial_analyst' to analyze this research data and identify the key investment insights.
 
-3. Use 'report_writer' to create a comprehensive, fact-based stock report.
+3. Use 'report_writer' to create a comprehensive, fact-based stock report from the research and analysis.
 
-The final report should be professional, balanced, and grounded in the verified research.`
+The final report should be professional, balanced, and grounded in the verified research.
+Return only final JSON with company, mode, research_markdown, analysis_markdown, and report_markdown.`
 }

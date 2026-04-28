@@ -14,7 +14,7 @@ type CampaignResult struct {
 	SelectedDomain    string            `json:"selected_domain"`
 	WebsiteFiles      map[string]string `json:"website_files"`
 	MarketingStrategy string            `json:"marketing_strategy"`
-	LogoJPEG          string            `json:"logo_jpeg"`
+	LogoPath          string            `json:"logo_path"`
 	Summary           string            `json:"summary"`
 }
 
@@ -42,7 +42,7 @@ type MarketingAgent interface {
 }
 
 type LogoAgent interface {
-	GenerateLogo(ctx context.Context, brandName, style string) ([]byte, error)
+	GenerateLogo(ctx context.Context, brandName, style string) (string, error)
 }
 
 type MarketingCoordinator interface {

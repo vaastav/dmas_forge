@@ -9,24 +9,23 @@ import (
 )
 
 type DataEvaluatorAgentImpl struct {
-	agent          core.Agent
-	defaultCompany string
-	defaultMode    string
+	agent core.Agent
 }
 
-func NewDataEvaluatorAgentImpl(ctx context.Context, agent core.Agent, company string, mode string) (DataEvaluatorAgent, error) {
+func NewDataEvaluatorAgentImpl(ctx context.Context, agent core.Agent) (DataEvaluatorAgent, error) {
+	sysPrompt := prompts.EvaluatorPrompt()
+	if err := agent.AddSystemPrompt(ctx, sysPrompt); err != nil {
+		return nil, fmt.Errorf("adding evaluator system prompt: %w", err)
+	}
+
 	return &DataEvaluatorAgentImpl{
-		agent:          agent,
-		defaultCompany: company,
-		defaultMode:    NormalizeMode(mode),
+		agent: agent,
 	}, nil
 }
 
 func (a *DataEvaluatorAgentImpl) EvaluateData(ctx context.Context, req EvaluationRequest) (EvaluationRecord, error) {
-	company := firstNonEmpty(req.Company, a.defaultCompany)
-	mode := NormalizeMode(firstNonEmpty(req.Mode, a.defaultMode))
-
-	if err := a.agent.AddSystemPrompt(ctx, prompts.EvaluatorPrompt(company, IsSanityMode(mode))); err != nil {
+	company, mode, err := requireCompanyAndMode(req.Company, req.Mode)
+	if err != nil {
 		return EvaluationRecord{}, err
 	}
 

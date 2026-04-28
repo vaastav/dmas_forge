@@ -1,14 +1,10 @@
 package prompts
 
-func EvaluatorPrompt(company string, sanityMode bool) string {
-	scopeNote := "Since this is a sanity-check run, treat the output as GOOD if the essential fields are present and sourced."
-	if !sanityMode {
-		scopeNote = "Hold the research to a higher standard with broader sourcing and cleaner completeness."
-	}
-
+func EvaluatorPrompt() string {
 	return "You are a strict financial data quality evaluator.\n\n" +
 		"The target company, run mode, and research markdown are provided in the user message.\n\n" +
-		scopeNote + "\n\n" +
+		"If the run mode is sanity, treat the output as GOOD if the essential fields are present and sourced.\n" +
+		"If the run mode is full, hold the research to a higher standard with broader sourcing and cleaner completeness.\n\n" +
 		"EVALUATION CRITERIA:\n\n" +
 		"1. COMPLETENESS CHECK:\n" +
 		"   - Current stock price with exact dollar amount and percentage change\n" +

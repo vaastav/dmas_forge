@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"image/jpeg"
 	"image/png"
+	"os"
+	"path/filepath"
 	"strings"
 
 	openai "github.com/openai/openai-go"
@@ -15,9 +17,8 @@ import (
 )
 
 // ImageGenTool returns the OpenAI function-calling tool definition for
-// generate_image.  The LLM supplies a prompt and receives a short status
-// confirmation; the actual image bytes are captured out-of-band via the
-// shared buffer passed to ImageGenHandler.
+// generate_image. The LLM supplies a prompt and receives metadata for the
+// generated local JPEG file.
 func ImageGenTool() openai.ChatCompletionToolParam {
 	return openai.ChatCompletionToolParam{
 		Function: openai.FunctionDefinitionParam{
@@ -38,10 +39,9 @@ func ImageGenTool() openai.ChatCompletionToolParam {
 }
 
 // ImageGenHandler returns a tool handler that calls the DALL-E API,
-// converts the resulting PNG to JPEG, and stores the compressed bytes in
-// dst.  The string returned to the LLM is a brief status message — the
-// image data never flows through the LLM context.
-func ImageGenHandler(client *openai.Client, dst *[]byte) core.ToolHandlerFn {
+// converts the resulting PNG to JPEG, stores it locally, and returns file
+// metadata. The image bytes never flow through the LLM context.
+func ImageGenHandler(client *openai.Client) core.ToolHandlerFn {
 	return func(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
 		if tc.Function.Name != "generate_image" {
 			return "", fmt.Errorf("unsupported tool: %s", tc.Function.Name)
@@ -62,9 +62,18 @@ func ImageGenHandler(client *openai.Client, dst *[]byte) core.ToolHandlerFn {
 			return "", err
 		}
 
-		*dst = jpegBytes
+		path, err := saveJPEG(jpegBytes)
+		if err != nil {
+			return "", err
+		}
 
-		return `{"status":"success"}`, nil
+		return marshalJSON(map[string]interface{}{
+			"status":     "success",
+			"path":       path,
+			"filename":   filepath.Base(path),
+			"mime_type":  "image/jpeg",
+			"size_bytes": len(jpegBytes),
+		})
 	}
 }
 
@@ -102,4 +111,32 @@ func generateJPEG(ctx context.Context, client *openai.Client, prompt string) ([]
 	}
 
 	return buf.Bytes(), nil
+}
+
+func saveJPEG(data []byte) (string, error) {
+	dir := filepath.Join(os.TempDir(), "dmas_forge", "marketing-agency", "logos")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("create logo output directory: %w", err)
+	}
+	file, err := os.CreateTemp(dir, "logo_*.jpg")
+	if err != nil {
+		return "", fmt.Errorf("create logo image: %w", err)
+	}
+	path := file.Name()
+	if _, err := file.Write(data); err != nil {
+		file.Close()
+		return "", fmt.Errorf("write logo image: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return "", fmt.Errorf("close logo image: %w", err)
+	}
+	return path, nil
+}
+
+func marshalJSON(v interface{}) (string, error) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }

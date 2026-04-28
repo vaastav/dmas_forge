@@ -117,3 +117,24 @@ func firstNonEmpty(values ...string) string {
 	}
 	return ""
 }
+
+func requireCompanyAndMode(company, mode string) (string, string, error) {
+	company = strings.TrimSpace(company)
+	mode = strings.TrimSpace(mode)
+
+	validationErrors := []string{}
+
+	if company == "" {
+		validationErrors = append(validationErrors, "\"company\" must be provided and cannot be empty.")
+	}
+
+	if mode == "" || (mode != ModeSanity && mode != ModeFull) {
+		validationErrors = append(validationErrors, "\"mode\" must be provided as \"sanity\" or \"full\".")
+	}
+
+	if len(validationErrors) > 0 {
+		return "", "", fmt.Errorf("invalid request: %s", strings.Join(validationErrors, " "))
+	}
+
+	return company, mode, nil
+}

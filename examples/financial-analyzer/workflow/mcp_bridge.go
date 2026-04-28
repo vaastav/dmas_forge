@@ -47,14 +47,15 @@ func NewMCPToolBridge(ctx context.Context, serverURLs []string) (*MCPToolBridge,
 			continue
 		}
 
-		idx := len(b.sessions)
-		b.sessions = append(b.sessions, session)
-
 		result, err := session.ListTools(ctx, nil)
 		if err != nil {
 			log.Printf("MCP bridge: failed to list tools from %s: %v", url, err)
+			_ = session.Close()
 			continue
 		}
+
+		idx := len(b.sessions)
+		b.sessions = append(b.sessions, session)
 
 		for _, tool := range result.Tools {
 			if _, exists := b.toolToIdx[tool.Name]; exists {
@@ -71,6 +72,9 @@ func NewMCPToolBridge(ctx context.Context, serverURLs []string) (*MCPToolBridge,
 	}
 
 	if len(b.tools) == 0 {
+		for _, session := range b.sessions {
+			_ = session.Close()
+		}
 		return nil, fmt.Errorf("no tools discovered from any MCP server")
 	}
 

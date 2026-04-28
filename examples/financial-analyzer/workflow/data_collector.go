@@ -10,13 +10,11 @@ import (
 )
 
 type DataCollectorAgentImpl struct {
-	agent          core.Agent
-	bridge         *MCPToolBridge
-	defaultCompany string
-	defaultMode    string
+	agent  core.Agent
+	bridge *MCPToolBridge
 }
 
-func NewDataCollectorAgentImpl(ctx context.Context, agent core.Agent, mcpServerURLs string, company string, mode string) (DataCollectorAgent, error) {
+func NewDataCollectorAgentImpl(ctx context.Context, agent core.Agent, mcpServerURLs string) (DataCollectorAgent, error) {
 	urls := parseMCPServerURLs(mcpServerURLs)
 	bridge, err := NewMCPToolBridge(ctx, urls)
 	if err != nil {
@@ -28,30 +26,33 @@ func NewDataCollectorAgentImpl(ctx context.Context, agent core.Agent, mcpServerU
 		return nil, fmt.Errorf("adding MCP tools to collector agent: %w", err)
 	}
 
-	return &DataCollectorAgentImpl{
-		agent:          agent,
-		bridge:         bridge,
-		defaultCompany: company,
-		defaultMode:    NormalizeMode(mode),
-	}, nil
+	a := &DataCollectorAgentImpl{
+		agent:  agent,
+		bridge: bridge,
+	}
+
+	if err := agent.RegisterToolCallHandler(ctx, bridge.HandleToolCall); err != nil {
+		return nil, fmt.Errorf("registering MCP tool handler: %w", err)
+	}
+
+	sysPrompt := prompts.CollectorPrompt()
+	if err := agent.AddSystemPrompt(ctx, sysPrompt); err != nil {
+		return nil, fmt.Errorf("adding collector system prompt: %w", err)
+	}
+
+	return a, nil
 }
 
 func (a *DataCollectorAgentImpl) CollectData(ctx context.Context, req CollectionRequest) (CollectorResult, error) {
-	company := firstNonEmpty(req.Company, a.defaultCompany)
-	mode := NormalizeMode(firstNonEmpty(req.Mode, a.defaultMode))
+	company, mode, err := requireCompanyAndMode(req.Company, req.Mode)
+	if err != nil {
+		return CollectorResult{}, err
+	}
 	if strings.TrimSpace(req.Query) == "" {
 		return CollectorResult{}, fmt.Errorf("collection query cannot be empty")
 	}
 
-	if err := a.agent.RegisterToolCallHandler(ctx, a.bridge.HandleToolCall); err != nil {
-		return CollectorResult{}, fmt.Errorf("registering MCP tool handler: %w", err)
-	}
-
-	if err := a.agent.AddSystemPrompt(ctx, prompts.CollectorPrompt(company, IsSanityMode(mode))); err != nil {
-		return CollectorResult{}, fmt.Errorf("adding collector system prompt: %w", err)
-	}
-
-	userMsg := req.Query
+	userMsg := fmt.Sprintf("Target company: %s\nRun mode: %s\n\n%s", company, mode, req.Query)
 	if req.PriorResearch != "" {
 		userMsg += fmt.Sprintf(
 			"\n\n---\nPRIOR RESEARCH (improve on this, do not start from scratch):\n\n%s",
