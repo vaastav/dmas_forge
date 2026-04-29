@@ -74,23 +74,37 @@ type ComponentSummary struct {
 	TotalTokens  int64   `json:"total_tokens"`
 }
 
+type ResourceSample struct {
+	Timestamp     time.Time `json:"timestamp"`
+	ContainerID   string    `json:"container_id"`
+	ContainerName string    `json:"container_name"`
+	CPUPercent    float64   `json:"cpu_percent"`
+	MemoryBytes   int64     `json:"memory_bytes"`
+	MemoryPercent float64   `json:"memory_percent"`
+}
+
 type CaseSummary struct {
-	Example       string             `json:"example"`
-	Spec          string             `json:"spec"`
-	Profile       string             `json:"profile"`
-	Requests      int                `json:"requests"`
-	Successes     int                `json:"successes"`
-	Errors        int                `json:"errors"`
-	ElapsedMS     float64            `json:"elapsed_ms"`
-	ThroughputRPS float64            `json:"throughput_rps"`
-	P50MS         float64            `json:"p50_ms"`
-	P95MS         float64            `json:"p95_ms"`
-	P99MS         float64            `json:"p99_ms"`
-	InputTokens   int64              `json:"input_tokens"`
-	OutputTokens  int64              `json:"output_tokens"`
-	TotalTokens   int64              `json:"total_tokens"`
-	TraceError    string             `json:"trace_error,omitempty"`
-	Components    []ComponentSummary `json:"components"`
+	Example        string             `json:"example"`
+	Spec           string             `json:"spec"`
+	Profile        string             `json:"profile"`
+	Requests       int                `json:"requests"`
+	Successes      int                `json:"successes"`
+	Errors         int                `json:"errors"`
+	ElapsedMS      float64            `json:"elapsed_ms"`
+	ThroughputRPS  float64            `json:"throughput_rps"`
+	P50MS          float64            `json:"p50_ms"`
+	P95MS          float64            `json:"p95_ms"`
+	P99MS          float64            `json:"p99_ms"`
+	InputTokens    int64              `json:"input_tokens"`
+	OutputTokens   int64              `json:"output_tokens"`
+	TotalTokens    int64              `json:"total_tokens"`
+	TraceError     string             `json:"trace_error,omitempty"`
+	ResourceError  string             `json:"resource_error,omitempty"`
+	CPUAvgPercent  float64            `json:"cpu_avg_percent"`
+	CPUMaxPercent  float64            `json:"cpu_max_percent"`
+	MemoryAvgBytes int64              `json:"memory_avg_bytes"`
+	MemoryMaxBytes int64              `json:"memory_max_bytes"`
+	Components     []ComponentSummary `json:"components"`
 }
 
 type CasePlan struct {
@@ -362,9 +376,27 @@ func runCase(repoRoot, benchDir, modelFile, resultsRoot, caseDir, buildDir, case
 	}
 	endpoint := fmt.Sprintf("http://localhost:%d%s", httpPort, c.Example.Route)
 	fmt.Fprintf(progressWriter, "testing load %s requests=%d concurrency=%d endpoint=%s\n", c.Profile.Name, c.Profile.Requests, c.Profile.Concurrency, endpoint)
+	resourceContainers, resourceErr := listBenchmarkContainers(project)
+	if resourceErr != nil {
+		fmt.Fprintf(progressWriter, "resource sampling error: %v\n", resourceErr)
+	}
+	if resourceErr == nil && len(resourceContainers) == 0 {
+		fmt.Fprintf(detailWriter, "resource sampling: no non-jaeger containers found for project %s\n", project)
+	}
+	stopResources := startResourceSampling(resourceContainers, time.Second)
 	start := time.Now()
 	results := runLoad(endpoint, c, rows)
 	end := time.Now()
+	resourceSamples, stopErr := stopResources()
+	if resourceErr == nil {
+		resourceErr = stopErr
+	}
+	if stopErr != nil {
+		fmt.Fprintf(progressWriter, "resource sampling error: %v\n", stopErr)
+	}
+	if err := writeJSONL(filepath.Join(caseDir, "resources.jsonl"), resourceSamples); err != nil {
+		return err
+	}
 	if err := writeJSONL(filepath.Join(caseDir, "requests.jsonl"), results); err != nil {
 		return err
 	}
@@ -379,9 +411,12 @@ func runCase(repoRoot, benchDir, modelFile, resultsRoot, caseDir, buildDir, case
 	if err := writeJSONL(filepath.Join(caseDir, "spans.jsonl"), spans); err != nil {
 		return err
 	}
-	summary := summarizeCase(c, results, spans, end.Sub(start))
+	summary := summarizeCase(c, results, spans, resourceSamples, end.Sub(start))
 	if traceErr != nil {
 		summary.TraceError = traceErr.Error()
+	}
+	if resourceErr != nil {
+		summary.ResourceError = resourceErr.Error()
 	}
 	if err := writeJSON(filepath.Join(caseDir, "summary.json"), summary); err != nil {
 		return err
@@ -704,6 +739,139 @@ func composeProjectName(runID, caseName string) string {
 		prefix = prefix[:46]
 	}
 	return fmt.Sprintf("%s-%x", strings.TrimRight(prefix, "-"), sum[:4])
+}
+
+func listBenchmarkContainers(project string) ([]string, error) {
+	cmd := exec.Command("docker", "ps", "--filter", "label=com.docker.compose.project="+project, "--format", "{{.ID}}\t{{.Names}}")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("docker ps: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+
+	var containers []string
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "\t", 2)
+		id := strings.TrimSpace(parts[0])
+		name := ""
+		if len(parts) == 2 {
+			name = strings.TrimSpace(parts[1])
+		}
+		if id == "" || strings.Contains(strings.ToLower(name), "jaeger_ctr") {
+			continue
+		}
+		containers = append(containers, id)
+	}
+	return containers, nil
+}
+
+func startResourceSampling(containers []string, interval time.Duration) func() ([]ResourceSample, error) {
+	if len(containers) == 0 {
+		return func() ([]ResourceSample, error) { return nil, nil }
+	}
+	if interval <= 0 {
+		interval = time.Second
+	}
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	var samples []ResourceSample
+	var firstErr error
+
+	capture := func() {
+		rows, err := collectResourceSamples(containers)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			return
+		}
+		samples = append(samples, rows...)
+	}
+
+	go func() {
+		defer close(done)
+		capture()
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-ticker.C:
+				capture()
+			}
+		}
+	}()
+
+	return func() ([]ResourceSample, error) {
+		close(stop)
+		<-done
+		return samples, firstErr
+	}
+}
+
+func collectResourceSamples(containers []string) ([]ResourceSample, error) {
+	args := append([]string{"stats", "--no-stream", "--format", "{{json .}}"}, containers...)
+	cmd := exec.Command("docker", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("docker stats: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+
+	now := time.Now()
+	var samples []ResourceSample
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var row map[string]string
+		if err := json.Unmarshal([]byte(line), &row); err != nil {
+			return nil, fmt.Errorf("parse docker stats: %w", err)
+		}
+		samples = append(samples, ResourceSample{
+			Timestamp:     now,
+			ContainerID:   strings.TrimSpace(row["ID"]),
+			ContainerName: strings.TrimSpace(row["Name"]),
+			CPUPercent:    parsePercent(row["CPUPerc"]),
+			MemoryBytes:   parseMemoryBytes(row["MemUsage"]),
+			MemoryPercent: parsePercent(row["MemPerc"]),
+		})
+	}
+	return samples, nil
+}
+
+func parsePercent(value string) float64 {
+	value = strings.TrimSpace(strings.TrimSuffix(value, "%"))
+	value = strings.ReplaceAll(value, ",", "")
+	n, _ := strconv.ParseFloat(value, 64)
+	return n
+}
+
+func parseMemoryBytes(value string) int64 {
+	value = strings.TrimSpace(strings.Split(value, "/")[0])
+	if value == "" {
+		return 0
+	}
+	i := 0
+	for i < len(value) && ((value[i] >= '0' && value[i] <= '9') || value[i] == '.') {
+		i++
+	}
+	n, _ := strconv.ParseFloat(value[:i], 64)
+	unit := strings.ToLower(strings.TrimSpace(value[i:]))
+	multiplier := float64(1)
+	switch unit {
+	case "k", "kb", "kib":
+		multiplier = 1024
+	case "m", "mb", "mib":
+		multiplier = 1024 * 1024
+	case "g", "gb", "gib":
+		multiplier = 1024 * 1024 * 1024
+	case "t", "tb", "tib":
+		multiplier = 1024 * 1024 * 1024 * 1024
+	}
+	return int64(n * multiplier)
 }
 
 func runCommand(cmdArgs []string, dir string, writer io.Writer) error {
@@ -1040,7 +1208,7 @@ func flattenSpans(traces []map[string]any) []map[string]any {
 	return rows
 }
 
-func summarizeCase(c CasePlan, results []RequestResult, spans []map[string]any, elapsed time.Duration) CaseSummary {
+func summarizeCase(c CasePlan, results []RequestResult, spans []map[string]any, resourceSamples []ResourceSample, elapsed time.Duration) CaseSummary {
 	var latencies []float64
 	successes := 0
 	for _, result := range results {
@@ -1087,28 +1255,72 @@ func summarizeCase(c CasePlan, results []RequestResult, spans []map[string]any, 
 	if elapsedSeconds > 0 {
 		throughput = float64(len(results)) / elapsedSeconds
 	}
+	cpuAvg, cpuMax, memAvg, memMax := summarizeResources(resourceSamples)
 	return CaseSummary{
-		Example:       c.Example.Name,
-		Spec:          c.Spec,
-		Profile:       c.Profile.Name,
-		Requests:      len(results),
-		Successes:     successes,
-		Errors:        len(results) - successes,
-		ElapsedMS:     float64(elapsed.Microseconds()) / 1000.0,
-		ThroughputRPS: throughput,
-		P50MS:         percentile(latencies, 50),
-		P95MS:         percentile(latencies, 95),
-		P99MS:         percentile(latencies, 99),
-		InputTokens:   totalIn,
-		OutputTokens:  totalOut,
-		TotalTokens:   totalTokens,
-		Components:    componentRows,
+		Example:        c.Example.Name,
+		Spec:           c.Spec,
+		Profile:        c.Profile.Name,
+		Requests:       len(results),
+		Successes:      successes,
+		Errors:         len(results) - successes,
+		ElapsedMS:      float64(elapsed.Microseconds()) / 1000.0,
+		ThroughputRPS:  throughput,
+		P50MS:          percentile(latencies, 50),
+		P95MS:          percentile(latencies, 95),
+		P99MS:          percentile(latencies, 99),
+		InputTokens:    totalIn,
+		OutputTokens:   totalOut,
+		TotalTokens:    totalTokens,
+		CPUAvgPercent:  cpuAvg,
+		CPUMaxPercent:  cpuMax,
+		MemoryAvgBytes: memAvg,
+		MemoryMaxBytes: memMax,
+		Components:     componentRows,
 	}
 }
 
+func summarizeResources(samples []ResourceSample) (float64, float64, int64, int64) {
+	if len(samples) == 0 {
+		return 0, 0, 0, 0
+	}
+
+	type totalSample struct {
+		cpuPercent float64
+		memory     int64
+	}
+
+	totals := map[string]*totalSample{}
+	for _, sample := range samples {
+		timestamp := sample.Timestamp.Format(time.RFC3339Nano)
+		total := totals[timestamp]
+		if total == nil {
+			total = &totalSample{}
+			totals[timestamp] = total
+		}
+		total.cpuPercent += sample.CPUPercent
+		total.memory += sample.MemoryBytes
+	}
+
+	var cpuSum, cpuMax float64
+	var memorySum, memoryMax int64
+	for _, total := range totals {
+		cpuSum += total.cpuPercent
+		if total.cpuPercent > cpuMax {
+			cpuMax = total.cpuPercent
+		}
+		memorySum += total.memory
+		if total.memory > memoryMax {
+			memoryMax = total.memory
+		}
+	}
+
+	count := float64(len(totals))
+	return cpuSum / count, cpuMax, int64(float64(memorySum) / count), memoryMax
+}
+
 func printCaseSummary(s CaseSummary) {
-	fmt.Printf("%s %s %s status=%s requests=%d ok=%d errors=%d throughput=%.2f/s p50=%.0fms p95=%.0fms p99=%.0fms tokens=%d trace=%s\n",
-		s.Example, s.Spec, s.Profile, summaryStatus(s), s.Requests, s.Successes, s.Errors, s.ThroughputRPS, s.P50MS, s.P95MS, s.P99MS, s.TotalTokens, traceStatus(s))
+	fmt.Printf("%s %s %s status=%s requests=%d ok=%d errors=%d throughput=%.2f/s p50=%.0fms p95=%.0fms p99=%.0fms tokens=%d trace=%s cpu_avg=%.2f cores cpu_max=%.2f cores mem_avg=%s mem_max=%s\n",
+		s.Example, s.Spec, s.Profile, summaryStatus(s), s.Requests, s.Successes, s.Errors, s.ThroughputRPS, s.P50MS, s.P95MS, s.P99MS, s.TotalTokens, traceStatus(s), cpuCores(s.CPUAvgPercent), cpuCores(s.CPUMaxPercent), formatBytes(s.MemoryAvgBytes), formatBytes(s.MemoryMaxBytes))
 	for _, comp := range s.Components {
 		if comp.Name == "llm.call" || comp.TotalTokens > 0 || strings.HasPrefix(comp.Name, "tool.") || strings.Contains(comp.Name, "mcp") || strings.Contains(comp.Name, "kb.") {
 			fmt.Printf("  %-24s %4d spans %9.0fms %8d tokens\n", comp.Name, comp.Spans, comp.DurationMS, comp.TotalTokens)
@@ -1117,14 +1329,44 @@ func printCaseSummary(s CaseSummary) {
 	if s.TraceError != "" {
 		fmt.Printf("  trace error: %s\n", s.TraceError)
 	}
+	if s.ResourceError != "" {
+		fmt.Printf("  resource error: %s\n", s.ResourceError)
+	}
 }
 
 func printSummaryTable(summaries []CaseSummary) {
-	fmt.Println("example spec profile status requests ok errors throughput p50 p95 p99 tokens trace")
+	fmt.Println("example spec profile status requests ok errors throughput p50 p95 p99 tokens trace cpu_avg_cores cpu_max_cores mem_avg mem_max")
 	for _, s := range summaries {
-		fmt.Printf("%s %s %s %s %d %d %d %.2f/s %.0fms %.0fms %.0fms %d %s\n",
-			s.Example, s.Spec, s.Profile, summaryStatus(s), s.Requests, s.Successes, s.Errors, s.ThroughputRPS, s.P50MS, s.P95MS, s.P99MS, s.TotalTokens, traceStatus(s))
+		fmt.Printf("%s %s %s %s %d %d %d %.2f/s %.0fms %.0fms %.0fms %d %s %.2f %.2f %s %s\n",
+			s.Example, s.Spec, s.Profile, summaryStatus(s), s.Requests, s.Successes, s.Errors, s.ThroughputRPS, s.P50MS, s.P95MS, s.P99MS, s.TotalTokens, traceStatus(s), cpuCores(s.CPUAvgPercent), cpuCores(s.CPUMaxPercent), formatBytes(s.MemoryAvgBytes), formatBytes(s.MemoryMaxBytes))
 	}
+}
+
+func cpuCores(cpuPercent float64) float64 {
+	return cpuPercent / 100.0
+}
+
+func formatBytes(bytes int64) string {
+	if bytes <= 0 {
+		return "0B"
+	}
+	units := []string{"B", "KiB", "MiB", "GiB", "TiB"}
+	value := float64(bytes)
+	unit := 0
+	for value >= 1024 && unit < len(units)-1 {
+		value /= 1024
+		unit++
+	}
+	if unit == 0 {
+		return fmt.Sprintf("%dB", bytes)
+	}
+	if value >= 100 {
+		return fmt.Sprintf("%.0f%s", value, units[unit])
+	}
+	if value >= 10 {
+		return fmt.Sprintf("%.1f%s", value, units[unit])
+	}
+	return fmt.Sprintf("%.2f%s", value, units[unit])
 }
 
 func summaryStatus(s CaseSummary) string {
