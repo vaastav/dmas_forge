@@ -29,3 +29,11 @@ jaeger/
 ```
 
 Set `"mock": true` in `config.json` to inject `DMAS_BENCH_MOCK=1` into benchmark containers. This mocks web search, image generation, and financial-analyzer MCP tools.
+
+Docker containers must be able to reach the model URL in `model.json`. If the model runs on a local/private host, expose a simple forwarding port first:
+
+```bash
+socat TCP-LISTEN:30001,reuseaddr,fork,bind=0.0.0.0 TCP:<MODEL_HOST>:<MODEL_PORT>
+```
+
+Then use a Docker-reachable URL in `model.json`, for example `http://host.docker.internal:30001/v1` or your host gateway IP.
