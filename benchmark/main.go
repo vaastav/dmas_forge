@@ -13,11 +13,13 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -337,6 +339,9 @@ func runCase(repoRoot, benchDir, modelFile, resultsRoot, caseDir, buildDir, case
 		return err
 	}
 	project := composeProjectName(filepath.Base(resultsRoot), caseName)
+	stopInterruptCleanup := stopCaseOnInterrupt(buildDir, overrideFile, project, caseName, progressWriter, detailWriter)
+	defer stopInterruptCleanup()
+
 	fmt.Fprintf(progressWriter, "stopping old containers for %s\n", caseName)
 	_ = composeDown(buildDir, overrideFile, project, detailWriter)
 	defer func() {
@@ -723,6 +728,27 @@ func composeDown(buildDir, overrideFile, project string, logWriter io.Writer) er
 	cmd.Stderr = logWriter
 	_ = cmd.Run()
 	return nil
+}
+
+func stopCaseOnInterrupt(buildDir, overrideFile, project, caseName string, progressWriter, logWriter io.Writer) func() {
+	signals := make(chan os.Signal, 1)
+	done := make(chan struct{})
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		select {
+		case <-signals:
+			fmt.Fprintf(progressWriter, "received interrupt; stopping containers for %s\n", caseName)
+			composeDown(buildDir, overrideFile, project, logWriter)
+			os.Exit(130)
+		case <-done:
+		}
+	}()
+
+	return func() {
+		signal.Stop(signals)
+		close(done)
+	}
 }
 
 func dumpComposeDiagnostics(buildDir, overrideFile, project string, logWriter io.Writer) {
