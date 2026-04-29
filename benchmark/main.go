@@ -389,6 +389,9 @@ func runCase(repoRoot, benchDir, modelFile, resultsRoot, caseDir, buildDir, case
 	if err := waitTCP("localhost", jaegerPort, 120*time.Second); err != nil {
 		return err
 	}
+	settleWait := 15 * time.Second
+	fmt.Fprintf(progressWriter, "waiting %s for services to settle before testing %s\n", settleWait, caseName)
+	time.Sleep(settleWait)
 
 	rows, err := loadQueries(filepath.Join(benchDir, c.Example.QueryFile))
 	if err != nil {
