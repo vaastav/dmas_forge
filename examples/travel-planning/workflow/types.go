@@ -3,19 +3,19 @@ package workflow
 import "context"
 
 type TravelPlannerAgent interface {
-	Plan(ctx context.Context, input string) (string, error)
+	Plan(ctx context.Context, request string) (string, error)
 }
 
 type LocalAgent interface {
-	Suggest(ctx context.Context, input string) (string, error)
+	Suggest(ctx context.Context, request string) (string, error)
 }
 
 type LanguageAgent interface {
-	Review(ctx context.Context, input string) (string, error)
+	Review(ctx context.Context, request string) (string, error)
 }
 
 type TravelSummaryAgent interface {
-	Summarize(ctx context.Context, input string) (string, error)
+	Summarize(ctx context.Context, request string) (string, error)
 }
 
 type TravelCoordinator interface {
