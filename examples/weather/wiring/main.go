@@ -11,7 +11,7 @@ func main() {
 	cmdbuilder.MakeAndExecute(
 		name,
 		specs.Single,
-		specs.Docker,
+		specs.HTTP,
 		specs.A2A,
 		specs.MCP,
 	)

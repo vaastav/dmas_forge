@@ -13,7 +13,7 @@ Inter-agent communication is transparent to the workflow code. The wiring spec d
 
 | Wiring spec | Inter-agent protocol | File |
 |---|---|---|
-| `docker` (default) | HTTP | `wiring/specs/default.go` |
+| `http` (default) | HTTP | `wiring/specs/default.go` |
 | `a2a` | Agent-to-Agent (A2A) | `wiring/specs/a2a.go` |
 | `mcp` | Model Context Protocol (MCP) | `wiring/specs/mcp.go` |
 
@@ -33,7 +33,7 @@ Edit `wiring/example_model.json` with your API key, model name, and URL:
 
 ```bash
 cd examples/weather/wiring
-go run main.go -w docker -o build -modfile=./example_model.json
+go run main.go -w http -o build -modfile=./example_model.json
 cd build/docker
 docker compose build && docker compose up -d
 ```

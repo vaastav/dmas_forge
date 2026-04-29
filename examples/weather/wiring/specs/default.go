@@ -15,13 +15,13 @@ import (
 	wf "github.com/vaastav/agentic_blueprint/examples/weather/workflow"
 )
 
-var Docker = cmdbuilder.SpecOption{
-	Name:        "docker",
+var HTTP = cmdbuilder.SpecOption{
+	Name:        "http",
 	Description: "Deploys each agent in a separate container with http connecting the agents, uses OpenAI for providing the agents",
-	Build:       makeDockerSpec,
+	Build:       makeHTTPSpec,
 }
 
-func makeDockerSpec(spec wiring.WiringSpec) ([]string, error) {
+func makeHTTPSpec(spec wiring.WiringSpec) ([]string, error) {
 
 	applyDockerDefaults := func(spec wiring.WiringSpec, serviceName string) string {
 		http.Deploy(spec, serviceName)

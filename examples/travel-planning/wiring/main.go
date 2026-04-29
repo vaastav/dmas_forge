@@ -10,6 +10,8 @@ func main() {
 	cmdbuilder.MakeAndExecute(
 		name,
 		specs.Single,
-		specs.Docker,
+		specs.HTTP,
+		specs.MCP,
+		specs.A2A,
 	)
 }

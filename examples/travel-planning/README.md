@@ -37,7 +37,7 @@ Edit `wiring/example_model.json` with your API key, model name, and URL:
 
 ```bash
 cd examples/travel-planning/wiring
-go run main.go -w docker -o build -modfile=./example_model.json
+go run main.go -w http -o build -modfile=./example_model.json
 cd build/docker
 cp ../.local.env .env
 docker compose build && docker compose up -d

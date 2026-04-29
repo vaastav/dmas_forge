@@ -10,25 +10,30 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/opentelemetry"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
 
+	"github.com/vaastav/agentic_blueprint/ai_plugins/mcp"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/model"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/openai_plugin"
 	wf "github.com/vaastav/agentic_blueprint/examples/travel-planning/workflow"
 )
 
-var HTTP = cmdbuilder.SpecOption{
-	Name:        "http",
-	Description: "Deploys travel-planning agents in containers with HTTP, using OpenAI models",
-	Build:       makeHTTPSpec,
+var MCP = cmdbuilder.SpecOption{
+	Name:        "mcp",
+	Description: "Deploys travel-planning agents in containers with MCP between agents and HTTP on the coordinator",
+	Build:       makeMCPSpec,
 }
 
-func makeHTTPSpec(spec wiring.WiringSpec) ([]string, error) {
+func makeMCPSpec(spec wiring.WiringSpec) ([]string, error) {
 	modelInfo, err := model.GetModelInfo()
 	if err != nil {
 		return []string{}, err
 	}
 
-	applyDockerDefaults := func(serviceName string) string {
-		http.Deploy(spec, serviceName)
+	applyDockerDefaults := func(serviceName string, exposeHTTP bool) string {
+		if exposeHTTP {
+			http.Deploy(spec, serviceName)
+		} else {
+			mcp.Deploy(spec, serviceName)
+		}
 		proc := goproc.Deploy(spec, serviceName)
 		opentelemetry.Logger(spec, proc)
 		return linuxcontainer.Deploy(spec, serviceName)
@@ -50,11 +55,11 @@ func makeHTTPSpec(spec wiring.WiringSpec) ([]string, error) {
 		opentelemetry.Instrument(spec, service, collector)
 	}
 
-	plannerContainer := applyDockerDefaults(plannerService)
-	localContainer := applyDockerDefaults(localService)
-	languageContainer := applyDockerDefaults(languageService)
-	summaryContainer := applyDockerDefaults(summaryService)
-	coordinatorContainer := applyDockerDefaults(coordinatorService)
+	plannerContainer := applyDockerDefaults(plannerService, false)
+	localContainer := applyDockerDefaults(localService, false)
+	languageContainer := applyDockerDefaults(languageService, false)
+	summaryContainer := applyDockerDefaults(summaryService, false)
+	coordinatorContainer := applyDockerDefaults(coordinatorService, true)
 
 	return []string{plannerContainer, localContainer, languageContainer, summaryContainer, coordinatorContainer}, nil
 }

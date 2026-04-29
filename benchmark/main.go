@@ -136,7 +136,7 @@ Run this from the benchmark directory:
   go run main.go -h
   go run main.go list
   go run main.go build -examples weather,chat -specs single,memory -rebuild
-  go run main.go run -examples weather -specs single,docker
+  go run main.go run -examples weather -specs single,http
   go run main.go summary -run 20260429-120000
   go run main.go jaeger -run 20260429-120000 -case weather-single-sequential
 
@@ -242,7 +242,7 @@ func commandRun(args []string) error {
 	runID := fs.String("run-id", time.Now().Format("20060102-150405"), "result run id")
 	rebuild := fs.Bool("rebuild", false, "regenerate cached builds")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: go run main.go run [-examples weather] [-specs single,docker] [-profiles sequential] [-run-id local] [-rebuild]")
+		fmt.Fprintln(fs.Output(), "Usage: go run main.go run [-examples weather] [-specs single,http] [-profiles sequential] [-run-id local] [-rebuild]")
 	}
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {

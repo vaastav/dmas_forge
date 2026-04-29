@@ -6,8 +6,8 @@
     {"name": "heavy", "requests": 50, "concurrency": 8, "timeout_seconds": 900}
   ],
   "examples": [
-    {"name": "weather", "specs": ["single", "docker", "mcp", "a2a"], "route": "/Query", "request": "params", "query_file": "queries/weather.csv", "entrypoint_env": "WAGENT_SERVICE_HTTP_BIND_ADDR", "params": ["query"]},
-    {"name": "travel-planning", "specs": ["single", "docker"], "route": "/Plan", "request": "params", "query_file": "queries/travel-planning.csv", "entrypoint_env": "COORDINATOR_SERVICE_HTTP_BIND_ADDR", "params": ["task"]},
+    {"name": "weather", "specs": ["single", "http", "mcp", "a2a"], "route": "/Query", "request": "params", "query_file": "queries/weather.csv", "entrypoint_env": "WAGENT_SERVICE_HTTP_BIND_ADDR", "params": ["query"]},
+    {"name": "travel-planning", "specs": ["single", "http", "mcp", "a2a"], "route": "/Plan", "request": "params", "query_file": "queries/travel-planning.csv", "entrypoint_env": "COORDINATOR_SERVICE_HTTP_BIND_ADDR", "params": ["task"]},
     {"name": "marketing-agency", "specs": ["single", "http", "mcp", "a2a"], "route": "/CreateCampaign", "request": "body", "query_file": "queries/marketing-agency.csv", "entrypoint_env": "COORDINATOR_SERVICE_HTTP_BIND_ADDR"},
     {"name": "financial-analyzer", "specs": ["single", "http", "mcp", "a2a"], "route": "/Analyze", "request": "params", "query_file": "queries/financial-analyzer.csv", "entrypoint_env": "COORDINATOR_SERVICE_HTTP_BIND_ADDR", "params": ["company", "mode"], "profiles": [
       {"name": "sequential", "requests": 3, "concurrency": 1, "timeout_seconds": 1200},
