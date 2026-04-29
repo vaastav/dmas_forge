@@ -134,7 +134,9 @@ func run(args []string) error {
 	case "build":
 		return commandBuild(args[2:])
 	case "run":
-		return commandRun(args[2:])
+		return commandRun(args[2:], false)
+	case "smoke":
+		return commandRun(args[2:], true)
 	case "summary":
 		return commandSummary(args[2:])
 	case "jaeger":
@@ -153,6 +155,7 @@ Run this from the benchmark directory:
   go run main.go list
   go run main.go build -examples weather,chat -specs single,memory -rebuild
   go run main.go run -examples weather -specs single,http
+  go run main.go smoke -examples weather -specs single,http -rebuild
   go run main.go summary -run 20260429-120000
   go run main.go jaeger -run 20260429-120000 -case weather-single-sequential
 
@@ -160,6 +163,7 @@ Commands:
   list      Print configured examples, specs, routes, and profiles.
   build     Generate cached builds under cached_builds/<example>/<spec>.
   run       Build/reuse, start Docker Compose, run fixed-count load, save results.
+  smoke     Build/reuse, start Docker Compose, run one request per example/spec profile.
   summary   Print a compact table from saved summary.json files.
   jaeger    Start Jaeger UI over one saved case's jaeger/ directory.
 
@@ -248,8 +252,12 @@ func commandBuild(args []string) error {
 	return nil
 }
 
-func commandRun(args []string) error {
-	fs := flag.NewFlagSet("run", flag.ContinueOnError)
+func commandRun(args []string, smoke bool) error {
+	commandName := "run"
+	if smoke {
+		commandName = "smoke"
+	}
+	fs := flag.NewFlagSet(commandName, flag.ContinueOnError)
 	fs.SetOutput(os.Stdout)
 	configPath := fs.String("config", "config.json", "config file")
 	exampleFilter := fs.String("examples", "", "comma-separated example names")
@@ -257,8 +265,9 @@ func commandRun(args []string) error {
 	profileFilter := fs.String("profiles", "", "comma-separated profile names")
 	runID := fs.String("run-id", time.Now().Format("20060102-150405"), "result run id")
 	rebuild := fs.Bool("rebuild", false, "regenerate cached builds")
+	usage := fmt.Sprintf("Usage: go run main.go %s [-examples weather] [-specs single,http] [-profiles sequential] [-run-id local] [-rebuild]", commandName)
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: go run main.go run [-examples weather] [-specs single,http] [-profiles sequential] [-run-id local] [-rebuild]")
+		fmt.Fprintln(fs.Output(), usage)
 	}
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -278,6 +287,12 @@ func commandRun(args []string) error {
 	cases := selectCases(cfg, splitCSV(*exampleFilter), splitCSV(*specFilter), splitCSV(*profileFilter))
 	if len(cases) == 0 {
 		return fmt.Errorf("no benchmark cases matched")
+	}
+	if smoke {
+		for i := range cases {
+			cases[i].Profile.Requests = 1
+			cases[i].Profile.Concurrency = 1
+		}
 	}
 
 	resultsRoot := filepath.Join(benchDir, "results", *runID)

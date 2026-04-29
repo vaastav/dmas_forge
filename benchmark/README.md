@@ -9,6 +9,7 @@ go run main.go -h
 go run main.go list
 go run main.go build -examples weather,chat -specs single,memory -rebuild
 go run main.go run -examples weather -specs single -profiles sequential
+go run main.go smoke -examples weather -specs single,http
 go run main.go summary -run <run-id>
 go run main.go jaeger -run <run-id> -case weather-single-sequential
 ```
