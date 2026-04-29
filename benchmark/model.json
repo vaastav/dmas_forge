@@ -1,0 +1,6 @@
+{
+  "name": "gpt-oss-120b",
+  "url": "http://172.27.41.239:30001/v1",
+  "key": "",
+  "embedding_model": "text-embedding-3-small"
+}
