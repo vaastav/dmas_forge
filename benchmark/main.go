@@ -290,10 +290,11 @@ func commandRun(args []string) error {
 		if err != nil {
 			return err
 		}
-		logWriter := io.MultiWriter(os.Stdout, logFile)
-		fmt.Fprintf(logWriter, "[%d/%d] running %s/%s/%s\n", i+1, len(cases), c.Example.Name, c.Spec, c.Profile.Name)
+		progressWriter := io.MultiWriter(os.Stdout, logFile)
+		fmt.Fprintf(progressWriter, "[%d/%d] running %s/%s/%s\n", i+1, len(cases), c.Example.Name, c.Spec, c.Profile.Name)
+		fmt.Fprintf(progressWriter, "docker/build logs: %s\n", filepath.Join(caseDir, "build.log"))
 
-		err = runCase(repoRoot, benchDir, modelFile, resultsRoot, caseDir, buildDir, caseName, cfg.Mock, c, logWriter, *rebuild)
+		err = runCase(repoRoot, benchDir, modelFile, resultsRoot, caseDir, buildDir, caseName, cfg.Mock, c, progressWriter, logFile, *rebuild)
 		closeErr := logFile.Close()
 		if err != nil {
 			return err
@@ -305,8 +306,9 @@ func commandRun(args []string) error {
 	return nil
 }
 
-func runCase(repoRoot, benchDir, modelFile, resultsRoot, caseDir, buildDir, caseName string, mock bool, c CasePlan, logWriter io.Writer, rebuild bool) error {
-	if err := buildDeployment(repoRoot, modelFile, c.Example, c.Spec, buildDir, logWriter, rebuild); err != nil {
+func runCase(repoRoot, benchDir, modelFile, resultsRoot, caseDir, buildDir, caseName string, mock bool, c CasePlan, progressWriter io.Writer, detailWriter io.Writer, rebuild bool) error {
+	fmt.Fprintf(progressWriter, "building deployment files for %s\n", caseName)
+	if err := buildDeployment(repoRoot, modelFile, c.Example, c.Spec, buildDir, detailWriter, rebuild); err != nil {
 		return err
 	}
 	jaegerDir := filepath.Join(caseDir, "jaeger")
@@ -324,19 +326,19 @@ func runCase(repoRoot, benchDir, modelFile, resultsRoot, caseDir, buildDir, case
 		return err
 	}
 	project := composeProjectName(filepath.Base(resultsRoot), caseName)
-	fmt.Fprintf(logWriter, "stopping old containers for %s\n", caseName)
-	_ = composeDown(buildDir, overrideFile, project, logWriter)
+	fmt.Fprintf(progressWriter, "stopping old containers for %s\n", caseName)
+	_ = composeDown(buildDir, overrideFile, project, detailWriter)
 	defer func() {
-		fmt.Fprintf(logWriter, "stopping containers for %s\n", caseName)
-		composeDown(buildDir, overrideFile, project, logWriter)
+		fmt.Fprintf(progressWriter, "stopping containers for %s\n", caseName)
+		composeDown(buildDir, overrideFile, project, detailWriter)
 	}()
 
-	fmt.Fprintf(logWriter, "building docker images for %s\n", caseName)
-	if err := runCommand(composeCommand(buildDir, overrideFile, project, "build"), filepath.Join(buildDir, "docker"), logWriter); err != nil {
+	fmt.Fprintf(progressWriter, "building docker images for %s\n", caseName)
+	if err := runCommand(composeCommand(buildDir, overrideFile, project, "build"), filepath.Join(buildDir, "docker"), detailWriter); err != nil {
 		return err
 	}
-	fmt.Fprintf(logWriter, "starting docker compose for %s\n", caseName)
-	if err := runCommand(composeCommand(buildDir, overrideFile, project, "up", "-d"), filepath.Join(buildDir, "docker"), logWriter); err != nil {
+	fmt.Fprintf(progressWriter, "starting docker compose for %s\n", caseName)
+	if err := runCommand(composeCommand(buildDir, overrideFile, project, "up", "-d"), filepath.Join(buildDir, "docker"), detailWriter); err != nil {
 		return err
 	}
 
@@ -358,7 +360,7 @@ func runCase(repoRoot, benchDir, modelFile, resultsRoot, caseDir, buildDir, case
 		return err
 	}
 	endpoint := fmt.Sprintf("http://localhost:%d%s", httpPort, c.Example.Route)
-	fmt.Fprintf(logWriter, "testing load %s requests=%d concurrency=%d endpoint=%s\n", c.Profile.Name, c.Profile.Requests, c.Profile.Concurrency, endpoint)
+	fmt.Fprintf(progressWriter, "testing load %s requests=%d concurrency=%d endpoint=%s\n", c.Profile.Name, c.Profile.Requests, c.Profile.Concurrency, endpoint)
 	start := time.Now()
 	results := runLoad(endpoint, c, rows)
 	end := time.Now()
@@ -366,7 +368,7 @@ func runCase(repoRoot, benchDir, modelFile, resultsRoot, caseDir, buildDir, case
 		return err
 	}
 
-	fmt.Fprintf(logWriter, "collecting traces for %s\n", caseName)
+	fmt.Fprintf(progressWriter, "collecting traces for %s\n", caseName)
 	time.Sleep(2 * time.Second)
 	traces, traceErr := collectTraces(fmt.Sprintf("http://localhost:%d", jaegerPort), start.Add(-2*time.Second), end.Add(2*time.Second))
 	if err := writeJSON(filepath.Join(caseDir, "traces.json"), map[string]any{"data": traces}); err != nil {
