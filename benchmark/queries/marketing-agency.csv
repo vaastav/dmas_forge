@@ -1,41 +1,41 @@
-id,brand_name,keywords,description,target_audience
-marketing-001,Organic Cakes Bakery,organic|cakes|bakery|artisan,Artisan organic cake bakery in Zurich,Health conscious consumers aged 25 to 45
-marketing-002,SunCare Solar,solar|maintenance|homes|energy,Residential solar panel cleaning and maintenance service,Homeowners with rooftop solar systems
-marketing-003,Fluent Steps,language|tutor|kids|online,Online language tutoring for children,Parents seeking flexible after school learning
-marketing-004,TrailForge Gear,hiking|gear|durable|outdoor,Durable hiking gear for weekend adventurers,Outdoor shoppers who value practical equipment
-marketing-005,CalmDesk,productivity|focus|workspace|remote,Remote work focus planner and desk routine app,Knowledge workers with busy calendars
-marketing-006,FreshBowl Kitchen,meal|prep|healthy|delivery,Healthy meal prep delivery for office lunches,Professionals who want convenient balanced meals
-marketing-007,PetNest Care,pets|boarding|grooming|local,Local pet boarding and grooming service,Urban pet owners who travel often
-marketing-008,BrightByte Tutors,coding|tutor|teens|projects,Coding tutoring through hands on teen projects,Parents of teenagers interested in STEM
-marketing-009,HarborFit,fitness|coaching|small|groups,Small group fitness coaching near the waterfront,Adults seeking friendly non intimidating workouts
-marketing-010,GreenCrate Market,grocery|local|sustainable|delivery,Sustainable local grocery delivery box,Households who buy seasonal produce
-marketing-011,LunaSleep,sleep|wellness|tracking|habits,Sleep habit coaching and gentle tracking app,Adults trying to improve sleep routines
-marketing-012,CraftCloud Studio,design|templates|small|business,Design template marketplace for small businesses,Founders needing quick polished marketing assets
-marketing-013,TinySprout Toys,toys|wooden|children|learning,Wooden learning toys for young children,Parents looking for durable educational toys
-marketing-014,RiverRun Bikes,bikes|repair|commute|mobile,Mobile bicycle repair for commuters,City cyclists who need fast repairs
-marketing-015,ClearLedger,accounting|freelance|tax|simple,Simple bookkeeping service for freelancers,Independent workers who dislike tax paperwork
-marketing-016,BloomRoom Plants,plants|indoor|delivery|care,Indoor plant delivery with care guidance,Apartment dwellers wanting low stress greenery
-marketing-017,NorthStar Resume,career|resume|interview|coaching,Resume and interview coaching for career switchers,Professionals changing industries
-marketing-018,QuietCup Tea,tea|premium|calm|ritual,Premium loose leaf tea subscription,Tea drinkers who enjoy calm daily rituals
-marketing-019,FixFlow Plumbing,plumbing|emergency|local|home,Local emergency plumbing service,Homeowners needing reliable urgent repairs
-marketing-020,PixelPals Photo,photography|family|events|local,Family and event photography studio,Parents and local event organizers
-marketing-021,SwiftShelf Storage,storage|moving|secure|city,Urban self storage with pickup service,Apartment renters during moves
-marketing-022,KindCare Home,eldercare|home|support|family,At home eldercare coordination service,Families coordinating care for older relatives
-marketing-023,NovaNotes,notes|students|study|organize,Study note organizer for university students,Students managing lectures and exams
-marketing-024,StonePath Legal,legal|startup|contracts|simple,Startup contract review and legal templates,Early founders needing practical legal help
-marketing-025,AquaPure Filters,water|filters|home|subscription,Home water filter subscription service,Families wanting easier filter replacement
-marketing-026,ChefKit Kids,cooking|kids|kits|family,Kids cooking kits for weekend family activities,Parents looking for screen free activities
-marketing-027,UrbanLeaf Compost,compost|apartment|green|pickup,Apartment compost pickup and clean bin swap,City residents trying to reduce waste
-marketing-028,Atlas Language,translation|business|documents|fast,Fast document translation for small businesses,Teams selling across languages
-marketing-029,GlowForge Skincare,skincare|natural|sensitive|routine,Natural skincare for sensitive skin,Consumers seeking simple gentle routines
-marketing-030,CodeNest Academy,coding|bootcamp|career|remote,Remote coding bootcamp for career changers,Adults preparing for junior developer roles
-marketing-031,EventEase,event|planning|corporate|local,Local corporate event planning service,Office managers planning team gatherings
-marketing-032,RoverReady,pets|travel|checklist|safety,Pet travel checklist and supply brand,Pet owners planning road trips
-marketing-033,MintMile Finance,budget|savings|families|simple,Simple family budgeting and savings app,Parents managing household finances
-marketing-034,CloudCart Repair,ecommerce|support|store|fixes,Ecommerce store repair service,Shop owners with broken checkout flows
-marketing-035,GoldenHour Yoga,yoga|beginner|calm|studio,Beginner friendly yoga studio,Adults who feel intimidated by fitness classes
-marketing-036,StudyBridge Abroad,study|abroad|advising|students,Study abroad advising service,Students applying to international programs
-marketing-037,SparkLab Parties,party|science|kids|events,Science themed birthday parties for kids,Parents planning memorable educational parties
-marketing-038,RootRise Coffee,coffee|ethical|subscription|local,Ethically sourced local coffee subscription,Coffee drinkers who care about origin
-marketing-039,SecureNest Cyber,cybersecurity|small|business|audit,Simple cybersecurity audit for small businesses,Owners without internal security staff
-marketing-040,PaperTrail Docs,documents|scan|organize|home,Home document scanning and organization service,Families drowning in paperwork
+brand_name,keywords,description,target_audience
+Organic Cakes Bakery,organic|cakes|bakery|artisan,Artisan organic cake bakery in Zurich,Health conscious consumers aged 25 to 45
+SunCare Solar,solar|maintenance|homes|energy,Residential solar panel cleaning and maintenance service,Homeowners with rooftop solar systems
+Fluent Steps,language|tutor|kids|online,Online language tutoring for children,Parents seeking flexible after school learning
+TrailForge Gear,hiking|gear|durable|outdoor,Durable hiking gear for weekend adventurers,Outdoor shoppers who value practical equipment
+CalmDesk,productivity|focus|workspace|remote,Remote work focus planner and desk routine app,Knowledge workers with busy calendars
+FreshBowl Kitchen,meal|prep|healthy|delivery,Healthy meal prep delivery for office lunches,Professionals who want convenient balanced meals
+PetNest Care,pets|boarding|grooming|local,Local pet boarding and grooming service,Urban pet owners who travel often
+BrightByte Tutors,coding|tutor|teens|projects,Coding tutoring through hands on teen projects,Parents of teenagers interested in STEM
+HarborFit,fitness|coaching|small|groups,Small group fitness coaching near the waterfront,Adults seeking friendly non intimidating workouts
+GreenCrate Market,grocery|local|sustainable|delivery,Sustainable local grocery delivery box,Households who buy seasonal produce
+LunaSleep,sleep|wellness|tracking|habits,Sleep habit coaching and gentle tracking app,Adults trying to improve sleep routines
+CraftCloud Studio,design|templates|small|business,Design template marketplace for small businesses,Founders needing quick polished marketing assets
+TinySprout Toys,toys|wooden|children|learning,Wooden learning toys for young children,Parents looking for durable educational toys
+RiverRun Bikes,bikes|repair|commute|mobile,Mobile bicycle repair for commuters,City cyclists who need fast repairs
+ClearLedger,accounting|freelance|tax|simple,Simple bookkeeping service for freelancers,Independent workers who dislike tax paperwork
+BloomRoom Plants,plants|indoor|delivery|care,Indoor plant delivery with care guidance,Apartment dwellers wanting low stress greenery
+NorthStar Resume,career|resume|interview|coaching,Resume and interview coaching for career switchers,Professionals changing industries
+QuietCup Tea,tea|premium|calm|ritual,Premium loose leaf tea subscription,Tea drinkers who enjoy calm daily rituals
+FixFlow Plumbing,plumbing|emergency|local|home,Local emergency plumbing service,Homeowners needing reliable urgent repairs
+PixelPals Photo,photography|family|events|local,Family and event photography studio,Parents and local event organizers
+SwiftShelf Storage,storage|moving|secure|city,Urban self storage with pickup service,Apartment renters during moves
+KindCare Home,eldercare|home|support|family,At home eldercare coordination service,Families coordinating care for older relatives
+NovaNotes,notes|students|study|organize,Study note organizer for university students,Students managing lectures and exams
+StonePath Legal,legal|startup|contracts|simple,Startup contract review and legal templates,Early founders needing practical legal help
+AquaPure Filters,water|filters|home|subscription,Home water filter subscription service,Families wanting easier filter replacement
+ChefKit Kids,cooking|kids|kits|family,Kids cooking kits for weekend family activities,Parents looking for screen free activities
+UrbanLeaf Compost,compost|apartment|green|pickup,Apartment compost pickup and clean bin swap,City residents trying to reduce waste
+Atlas Language,translation|business|documents|fast,Fast document translation for small businesses,Teams selling across languages
+GlowForge Skincare,skincare|natural|sensitive|routine,Natural skincare for sensitive skin,Consumers seeking simple gentle routines
+CodeNest Academy,coding|bootcamp|career|remote,Remote coding bootcamp for career changers,Adults preparing for junior developer roles
+EventEase,event|planning|corporate|local,Local corporate event planning service,Office managers planning team gatherings
+RoverReady,pets|travel|checklist|safety,Pet travel checklist and supply brand,Pet owners planning road trips
+MintMile Finance,budget|savings|families|simple,Simple family budgeting and savings app,Parents managing household finances
+CloudCart Repair,ecommerce|support|store|fixes,Ecommerce store repair service,Shop owners with broken checkout flows
+GoldenHour Yoga,yoga|beginner|calm|studio,Beginner friendly yoga studio,Adults who feel intimidated by fitness classes
+StudyBridge Abroad,study|abroad|advising|students,Study abroad advising service,Students applying to international programs
+SparkLab Parties,party|science|kids|events,Science themed birthday parties for kids,Parents planning memorable educational parties
+RootRise Coffee,coffee|ethical|subscription|local,Ethically sourced local coffee subscription,Coffee drinkers who care about origin
+SecureNest Cyber,cybersecurity|small|business|audit,Simple cybersecurity audit for small businesses,Owners without internal security staff
+PaperTrail Docs,documents|scan|organize|home,Home document scanning and organization service,Families drowning in paperwork

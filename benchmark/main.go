@@ -57,7 +57,6 @@ type RequestResult struct {
 	Spec          string  `json:"spec"`
 	Profile       string  `json:"profile"`
 	Sequence      int     `json:"sequence"`
-	QueryID       string  `json:"query_id"`
 	Status        int     `json:"status"`
 	OK            bool    `json:"ok"`
 	LatencyMS     float64 `json:"latency_ms"`
@@ -160,7 +159,7 @@ Run this from the benchmark directory:
   go run main.go jaeger -run 20260429-120000 -case weather-single-sequential
 
 Commands:
-  list      Print configured examples, specs, routes, and profiles.
+  list      Print configured examples, specs, query files, and profiles.
   build     Generate cached builds under cached_builds/<example>/<spec>.
   run       Build/reuse, start Docker Compose, run fixed-count load, save results.
   smoke     Build/reuse, start Docker Compose, run one request per example/spec profile.
@@ -198,13 +197,41 @@ func commandList(args []string) error {
 		return err
 	}
 	for _, ex := range cfg.Examples {
-		fmt.Printf("%-20s specs=%-28s route=%s entry=%s query=%s\n", ex.Name, strings.Join(ex.Specs, ","), ex.Route, ex.EntrypointEnv, ex.QueryFile)
+		profiles := cfg.Profiles
+		profileSource := "default"
+		if len(ex.Profiles) > 0 {
+			profiles = ex.Profiles
+			profileSource = "custom"
+		}
+		fmt.Printf("%-20s specs=%-28s profiles=%-24s query=%s\n", ex.Name, strings.Join(ex.Specs, ","), profileNames(profiles)+" ("+profileSource+")", ex.QueryFile)
 	}
 	fmt.Println()
+	fmt.Println("default profiles:")
 	for _, profile := range cfg.Profiles {
-		fmt.Printf("profile %-12s requests=%d concurrency=%d timeout=%ds\n", profile.Name, profile.Requests, profile.Concurrency, profile.TimeoutSeconds)
+		printProfile(profile)
+	}
+	for _, ex := range cfg.Examples {
+		if len(ex.Profiles) == 0 {
+			continue
+		}
+		fmt.Printf("%s profiles:\n", ex.Name)
+		for _, profile := range ex.Profiles {
+			printProfile(profile)
+		}
 	}
 	return nil
+}
+
+func profileNames(profiles []Profile) string {
+	names := make([]string, 0, len(profiles))
+	for _, profile := range profiles {
+		names = append(names, profile.Name)
+	}
+	return strings.Join(names, ",")
+}
+
+func printProfile(profile Profile) {
+	fmt.Printf("  %-12s requests=%d concurrency=%d timeout=%ds\n", profile.Name, profile.Requests, profile.Concurrency, profile.TimeoutSeconds)
 }
 
 func commandBuild(args []string) error {
@@ -1067,9 +1094,6 @@ func buildRequestURL(endpoint string, ex ExampleConfig, row QueryRow) string {
 	if ex.Request == "body" {
 		body := map[string]any{}
 		for key, value := range row {
-			if key == "id" {
-				continue
-			}
 			if strings.Contains(value, "|") {
 				body[key] = strings.Split(value, "|")
 			} else {
@@ -1082,9 +1106,7 @@ func buildRequestURL(endpoint string, ex ExampleConfig, row QueryRow) string {
 		keys := ex.Params
 		if len(keys) == 0 {
 			for key := range row {
-				if key != "id" {
-					keys = append(keys, key)
-				}
+				keys = append(keys, key)
 			}
 			sort.Strings(keys)
 		}
@@ -1128,7 +1150,6 @@ func sendOne(client *http.Client, reqURL string, c CasePlan, row QueryRow, seq i
 		Spec:          c.Spec,
 		Profile:       c.Profile.Name,
 		Sequence:      seq,
-		QueryID:       row["id"],
 		Status:        status,
 		OK:            status >= 200 && status < 300 && errText == "",
 		LatencyMS:     latency,

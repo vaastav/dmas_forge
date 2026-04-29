@@ -1,41 +1,41 @@
-id,company,mode
-finance-001,Apple,sanity
-finance-002,Microsoft,sanity
-finance-003,NVIDIA,sanity
-finance-004,Amazon,sanity
-finance-005,Alphabet,sanity
-finance-006,Meta,sanity
-finance-007,Tesla,sanity
-finance-008,Berkshire Hathaway,sanity
-finance-009,JPMorgan Chase,sanity
-finance-010,Visa,sanity
-finance-011,UnitedHealth,sanity
-finance-012,Exxon Mobil,sanity
-finance-013,Eli Lilly,sanity
-finance-014,Broadcom,sanity
-finance-015,Costco,sanity
-finance-016,Walmart,sanity
-finance-017,Mastercard,sanity
-finance-018,Oracle,sanity
-finance-019,Netflix,sanity
-finance-020,Adobe,sanity
-finance-021,Salesforce,sanity
-finance-022,AMD,sanity
-finance-023,Intel,sanity
-finance-024,Coca-Cola,sanity
-finance-025,PepsiCo,sanity
-finance-026,Nike,sanity
-finance-027,McDonald's,sanity
-finance-028,Disney,sanity
-finance-029,Uber,sanity
-finance-030,Airbnb,sanity
-finance-031,Shopify,sanity
-finance-032,ServiceNow,sanity
-finance-033,Cisco,sanity
-finance-034,Qualcomm,sanity
-finance-035,Texas Instruments,sanity
-finance-036,Chevron,sanity
-finance-037,Procter & Gamble,sanity
-finance-038,Johnson & Johnson,sanity
-finance-039,Home Depot,sanity
-finance-040,PayPal,sanity
+company,mode
+Apple,sanity
+Microsoft,full
+NVIDIA,sanity
+Amazon,full
+Alphabet,sanity
+Meta,full
+Tesla,sanity
+Berkshire Hathaway,full
+JPMorgan Chase,sanity
+Visa,full
+UnitedHealth,sanity
+Exxon Mobil,full
+Eli Lilly,sanity
+Broadcom,full
+Costco,sanity
+Walmart,full
+Mastercard,sanity
+Oracle,full
+Netflix,sanity
+Adobe,full
+Salesforce,sanity
+AMD,full
+Intel,sanity
+Coca-Cola,full
+PepsiCo,sanity
+Nike,full
+McDonald's,sanity
+Disney,full
+Uber,sanity
+Airbnb,full
+Shopify,sanity
+ServiceNow,full
+Cisco,sanity
+Qualcomm,full
+Texas Instruments,sanity
+Chevron,full
+Procter & Gamble,sanity
+Johnson & Johnson,full
+Home Depot,sanity
+PayPal,full
