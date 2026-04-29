@@ -7,6 +7,9 @@ import (
 	openai "github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type OpenAILLMClient struct {
@@ -54,6 +57,17 @@ func (c *OpenAILLMClient) AddTools(ctx context.Context, tooldefs map[string]open
 }
 
 func (c *OpenAILLMClient) LLMCall(ctx context.Context, query string) (string, error) {
+	tracer := trace.SpanFromContext(ctx).TracerProvider().Tracer("github.com/vaastav/agentic_blueprint/ai_runtime/plugins/openaiagent")
+	ctx, span := tracer.Start(ctx, "llm.call",
+		trace.WithAttributes(
+			attribute.String("llm.provider", "openai"),
+			attribute.String("llm.model", c.model),
+			attribute.String("llm.call_type", "LLMCall"),
+			attribute.Bool("llm.tools_enabled", false),
+		),
+	)
+	defer span.End()
+
 	params := openai.ChatCompletionNewParams{
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.SystemMessage(c.sysMsg),
@@ -64,8 +78,10 @@ func (c *OpenAILLMClient) LLMCall(ctx context.Context, query string) (string, er
 
 	completion, err := c.client.Chat.Completions.New(ctx, params)
 	if err != nil {
+		recordSpanError(span, err)
 		return "", err
 	}
+	setTokenAttributes(span, completion.Usage)
 	return completion.Choices[0].Message.Content, nil
 }
 
@@ -76,6 +92,19 @@ func (c *OpenAILLMClient) LLMCall(ctx context.Context, query string) (string, er
 const defaultMaxToolRounds = 10
 
 func (c *OpenAILLMClient) LLMCallWithTools(ctx context.Context, query string) (string, error) {
+	tracer := trace.SpanFromContext(ctx).TracerProvider().Tracer("github.com/vaastav/agentic_blueprint/ai_runtime/plugins/openaiagent")
+	ctx, span := tracer.Start(ctx, "llm.call",
+		trace.WithAttributes(
+			attribute.String("llm.provider", "openai"),
+			attribute.String("llm.model", c.model),
+			attribute.String("llm.call_type", "LLMCallWithTools"),
+			attribute.Bool("llm.tools_enabled", true),
+			attribute.Int("llm.tool_count", len(c.tools)),
+			attribute.Int("llm.max_tool_rounds", c.maxToolRounds),
+		),
+	)
+	defer span.End()
+
 	params := openai.ChatCompletionNewParams{
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.SystemMessage(c.sysMsg),
@@ -85,25 +114,53 @@ func (c *OpenAILLMClient) LLMCallWithTools(ctx context.Context, query string) (s
 		Model: c.model,
 	}
 
-	for range c.maxToolRounds {
+	var inputTokens int64
+	var outputTokens int64
+	var totalTokens int64
+	tokenUsageAvailable := false
+	toolCallCount := 0
+
+	for round := range c.maxToolRounds {
 		completion, err := c.client.Chat.Completions.New(ctx, params)
 		if err != nil {
+			recordSpanError(span, err)
 			return "", err
+		}
+		if hasTokenUsage(completion.Usage) {
+			tokenUsageAvailable = true
+			inputTokens += completion.Usage.PromptTokens
+			outputTokens += completion.Usage.CompletionTokens
+			totalTokens += completion.Usage.TotalTokens
 		}
 
 		toolCalls := completion.Choices[0].Message.ToolCalls
 		if len(toolCalls) == 0 {
+			setAggregatedTokenAttributes(span, tokenUsageAvailable, inputTokens, outputTokens, totalTokens)
+			span.SetAttributes(attribute.Int("llm.tool_call_count", toolCallCount))
 			return completion.Choices[0].Message.Content, nil
 		}
 
 		// Handle tool calls and continue the conversation
 		params.Messages = append(params.Messages, completion.Choices[0].Message.ToParam())
 		for _, toolCall := range toolCalls {
-			res, err := c.toolHandlerFn(ctx, toolCall)
+			toolCallCount++
+			toolCtx, toolSpan := tracer.Start(ctx, "llm.tool_call",
+				trace.WithAttributes(
+					attribute.String("tool.name", toolCall.Function.Name),
+					attribute.String("tool.id", toolCall.ID),
+					attribute.Int("tool.round", round+1),
+				),
+			)
+			res, err := c.toolHandlerFn(toolCtx, toolCall)
 			if err != nil {
 				// Abort if the tool handler function was unable to handle the tool call
+				recordSpanError(toolSpan, err)
+				toolSpan.End()
+				recordSpanError(span, err)
 				return "", err
 			}
+			toolSpan.SetStatus(codes.Ok, "")
+			toolSpan.End()
 			params.Messages = append(params.Messages, openai.ToolMessage(res, toolCall.ID))
 		}
 	}
@@ -113,8 +170,20 @@ func (c *OpenAILLMClient) LLMCallWithTools(ctx context.Context, query string) (s
 	params.Tools = nil
 	completion, err := c.client.Chat.Completions.New(ctx, params)
 	if err != nil {
+		recordSpanError(span, err)
 		return "", err
 	}
+	if hasTokenUsage(completion.Usage) {
+		tokenUsageAvailable = true
+		inputTokens += completion.Usage.PromptTokens
+		outputTokens += completion.Usage.CompletionTokens
+		totalTokens += completion.Usage.TotalTokens
+	}
+	setAggregatedTokenAttributes(span, tokenUsageAvailable, inputTokens, outputTokens, totalTokens)
+	span.SetAttributes(
+		attribute.Int("llm.tool_call_count", toolCallCount),
+		attribute.Bool("llm.max_tool_rounds_exhausted", true),
+	)
 	return completion.Choices[0].Message.Content, nil
 }
 
@@ -124,4 +193,32 @@ func mapsToValues(tooldefs map[string]openai.ChatCompletionToolParam) []openai.C
 		vals = append(vals, v)
 	}
 	return vals
+}
+
+func hasTokenUsage(usage openai.CompletionUsage) bool {
+	return usage.PromptTokens > 0 || usage.CompletionTokens > 0 || usage.TotalTokens > 0
+}
+
+func setTokenAttributes(span interface{ SetAttributes(...attribute.KeyValue) }, usage openai.CompletionUsage) {
+	setAggregatedTokenAttributes(span, hasTokenUsage(usage), usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens)
+}
+
+func setAggregatedTokenAttributes(span interface{ SetAttributes(...attribute.KeyValue) }, available bool, inputTokens, outputTokens, totalTokens int64) {
+	attrs := []attribute.KeyValue{attribute.Bool("llm.token_usage_available", available)}
+	if available {
+		attrs = append(attrs,
+			attribute.Int64("llm.input_tokens", inputTokens),
+			attribute.Int64("llm.output_tokens", outputTokens),
+			attribute.Int64("llm.total_tokens", totalTokens),
+		)
+	}
+	span.SetAttributes(attrs...)
+}
+
+func recordSpanError(span interface {
+	RecordError(error, ...trace.EventOption)
+	SetStatus(codes.Code, string)
+}, err error) {
+	span.RecordError(err)
+	span.SetStatus(codes.Error, err.Error())
 }

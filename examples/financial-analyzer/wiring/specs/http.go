@@ -6,6 +6,7 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/goproc"
 	"github.com/blueprint-uservices/blueprint/plugins/http"
 	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
+	"github.com/blueprint-uservices/blueprint/plugins/opentelemetry"
 )
 
 var HTTP = cmdbuilder.SpecOption{
@@ -19,10 +20,12 @@ func makeHTTPSpec(spec wiring.WiringSpec) ([]string, error) {
 	if err != nil {
 		return []string{}, err
 	}
+	instrumentFinancialServices(spec, services)
 
 	deployService := func(serviceName string) string {
 		http.Deploy(spec, serviceName)
-		goproc.Deploy(spec, serviceName)
+		proc := goproc.Deploy(spec, serviceName)
+		opentelemetry.Logger(spec, proc)
 		return linuxcontainer.Deploy(spec, serviceName)
 	}
 

@@ -7,6 +7,9 @@ import (
 
 	openai "github.com/openai/openai-go"
 	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var ragToolDefs = map[string]openai.ChatCompletionToolParam{
@@ -117,16 +120,31 @@ func (r *RAGAgent) buildCompositeHandler() core.ToolHandlerFn {
 }
 
 func (r *RAGAgent) handleRAGToolCall(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
+	tracer := trace.SpanFromContext(ctx).TracerProvider().Tracer("github.com/vaastav/agentic_blueprint/ai_runtime/plugins/rag")
+	ctx, span := tracer.Start(ctx, "rag.tool_call",
+		trace.WithAttributes(attribute.String("tool.name", tc.Function.Name)),
+	)
+	defer span.End()
+
+	var result string
+	var err error
 	switch tc.Function.Name {
 	case "search_knowledge":
-		return r.handleSearchKnowledge(ctx, tc)
+		result, err = r.handleSearchKnowledge(ctx, tc)
 	case "index_document":
-		return r.handleIndexDocument(ctx, tc)
+		result, err = r.handleIndexDocument(ctx, tc)
 	case "delete_document":
-		return r.handleDeleteDocument(ctx, tc)
+		result, err = r.handleDeleteDocument(ctx, tc)
 	default:
-		return "", fmt.Errorf("unknown rag tool: %s", tc.Function.Name)
+		err = fmt.Errorf("unknown rag tool: %s", tc.Function.Name)
 	}
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return "", err
+	}
+	span.SetStatus(codes.Ok, "")
+	return result, nil
 }
 
 func (r *RAGAgent) handleSearchKnowledge(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {

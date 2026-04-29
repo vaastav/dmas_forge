@@ -5,7 +5,9 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/cmdbuilder"
 	"github.com/blueprint-uservices/blueprint/plugins/goproc"
 	"github.com/blueprint-uservices/blueprint/plugins/http"
+	"github.com/blueprint-uservices/blueprint/plugins/jaeger"
 	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
+	"github.com/blueprint-uservices/blueprint/plugins/opentelemetry"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
 
 	"github.com/vaastav/agentic_blueprint/ai_plugins/memory_plugin"
@@ -59,7 +61,10 @@ func readModelInfo() (model.ModelInfo, error) {
 
 func deployChatService(spec wiring.WiringSpec, agent string) string {
 	chatService := workflow.Service[wf.ChatAgent](spec, "chat_service", agent)
+	collector := jaeger.Collector(spec, "jaeger")
+	opentelemetry.Instrument(spec, chatService, collector)
 	http.Deploy(spec, chatService)
-	goproc.Deploy(spec, chatService)
+	proc := goproc.Deploy(spec, chatService)
+	opentelemetry.Logger(spec, proc)
 	return linuxcontainer.Deploy(spec, chatService)
 }

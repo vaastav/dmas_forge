@@ -5,7 +5,9 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/cmdbuilder"
 	"github.com/blueprint-uservices/blueprint/plugins/goproc"
 	"github.com/blueprint-uservices/blueprint/plugins/http"
+	"github.com/blueprint-uservices/blueprint/plugins/jaeger"
 	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
+	"github.com/blueprint-uservices/blueprint/plugins/opentelemetry"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/model"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/openai_plugin"
@@ -37,8 +39,11 @@ func makeAgenticSpec(spec wiring.WiringSpec) ([]string, error) {
 	})
 
 	chatService := workflow.Service[wf.ChatAgent](spec, "chat_service", agent, kb, "")
+	collector := jaeger.Collector(spec, "jaeger")
+	opentelemetry.Instrument(spec, chatService, collector)
 	http.Deploy(spec, chatService)
-	goproc.Deploy(spec, chatService)
+	proc := goproc.Deploy(spec, chatService)
+	opentelemetry.Logger(spec, proc)
 	chatCtr := linuxcontainer.Deploy(spec, chatService)
 	return []string{chatCtr}, nil
 }

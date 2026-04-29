@@ -10,6 +10,9 @@ import (
 	openai "github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // OpenAIKnowledgeBase implements core.KnowledgeBase using OpenAI embeddings
@@ -39,13 +42,26 @@ func NewOpenAIKnowledgeBase(ctx context.Context, baseURL string, apiKey string, 
 }
 
 func (kb *OpenAIKnowledgeBase) Index(ctx context.Context, doc core.Document) error {
+	tracer := trace.SpanFromContext(ctx).TracerProvider().Tracer("github.com/vaastav/agentic_blueprint/ai_runtime/plugins/rag")
+	ctx, span := tracer.Start(ctx, "kb.index",
+		trace.WithAttributes(
+			attribute.String("kb.provider", "openai"),
+			attribute.String("kb.embedding_model", kb.model),
+			attribute.String("kb.document_id", doc.ID),
+		),
+	)
+	defer span.End()
+
 	chunks, err := chunkDocument(doc)
 	if err != nil {
+		recordKBError(span, err)
 		return err
 	}
+	span.SetAttributes(attribute.Int("kb.chunk_count", len(chunks)))
 
 	// Delete any existing chunks with this document ID
 	if err := kb.Delete(ctx, doc.ID); err != nil {
+		recordKBError(span, err)
 		return err
 	}
 
@@ -54,17 +70,31 @@ func (kb *OpenAIKnowledgeBase) Index(ctx context.Context, doc core.Document) err
 		inputs = append(inputs, chunk.content)
 	}
 
-	resp, err := kb.client.Embeddings.New(ctx, openai.EmbeddingNewParams{
+	embedCtx, embedSpan := tracer.Start(ctx, "embedding.create",
+		trace.WithAttributes(
+			attribute.String("embedding.provider", "openai"),
+			attribute.String("embedding.model", kb.model),
+			attribute.Int("embedding.input_count", len(inputs)),
+		),
+	)
+	resp, err := kb.client.Embeddings.New(embedCtx, openai.EmbeddingNewParams{
 		Input:          openai.EmbeddingNewParamsInputUnion{OfArrayOfStrings: inputs},
 		Model:          kb.model,
 		EncodingFormat: openai.EmbeddingNewParamsEncodingFormatFloat,
 	})
-
 	if err != nil {
+		recordKBError(embedSpan, err)
+		embedSpan.End()
+		recordKBError(span, err)
 		return fmt.Errorf("openai knowledge base: create embeddings: %w", err)
 	}
+	embedSpan.SetStatus(codes.Ok, "")
+	embedSpan.End()
+
 	if len(resp.Data) != len(chunks) {
-		return fmt.Errorf("openai knowledge base: expected %d embeddings, got %d", len(chunks), len(resp.Data))
+		err := fmt.Errorf("openai knowledge base: expected %d embeddings, got %d", len(chunks), len(resp.Data))
+		recordKBError(span, err)
+		return err
 	}
 
 	storedIDs := make([]string, 0, len(chunks))
@@ -81,6 +111,7 @@ func (kb *OpenAIKnowledgeBase) Index(ctx context.Context, doc core.Document) err
 			for _, storedID := range storedIDs {
 				_ = kb.vectorStore.Delete(ctx, storedID)
 			}
+			recordKBError(span, err)
 			return fmt.Errorf("openai knowledge base: store vector: %w", err)
 		}
 
@@ -90,28 +121,54 @@ func (kb *OpenAIKnowledgeBase) Index(ctx context.Context, doc core.Document) err
 	kb.mu.Lock()
 	kb.docChunks[doc.ID] = storedIDs
 	kb.mu.Unlock()
+	span.SetStatus(codes.Ok, "")
 	return nil
 }
 
 func (kb *OpenAIKnowledgeBase) Query(ctx context.Context, query string, topK int) ([]core.Chunk, error) {
+	tracer := trace.SpanFromContext(ctx).TracerProvider().Tracer("github.com/vaastav/agentic_blueprint/ai_runtime/plugins/rag")
+	ctx, span := tracer.Start(ctx, "kb.query",
+		trace.WithAttributes(
+			attribute.String("kb.provider", "openai"),
+			attribute.String("kb.embedding_model", kb.model),
+			attribute.Int("kb.top_k", topK),
+		),
+	)
+	defer span.End()
+
 	if topK <= 0 || strings.TrimSpace(query) == "" {
+		span.SetStatus(codes.Ok, "")
 		return []core.Chunk{}, nil
 	}
 
-	resp, err := kb.client.Embeddings.New(ctx, openai.EmbeddingNewParams{
+	embedCtx, embedSpan := tracer.Start(ctx, "embedding.create",
+		trace.WithAttributes(
+			attribute.String("embedding.provider", "openai"),
+			attribute.String("embedding.model", kb.model),
+			attribute.Int("embedding.input_count", 1),
+		),
+	)
+	resp, err := kb.client.Embeddings.New(embedCtx, openai.EmbeddingNewParams{
 		Input:          openai.EmbeddingNewParamsInputUnion{OfString: openai.String(query)},
 		Model:          kb.model,
 		EncodingFormat: openai.EmbeddingNewParamsEncodingFormatFloat,
 	})
 	if err != nil {
+		recordKBError(embedSpan, err)
+		embedSpan.End()
+		recordKBError(span, err)
 		return nil, fmt.Errorf("openai knowledge base: create query embedding: %w", err)
 	}
+	embedSpan.SetStatus(codes.Ok, "")
+	embedSpan.End()
 	if len(resp.Data) == 0 {
+		span.SetStatus(codes.Ok, "")
 		return []core.Chunk{}, nil
 	}
 
 	matches, err := kb.vectorStore.Query(ctx, resp.Data[0].Embedding, topK)
 	if err != nil {
+		recordKBError(span, err)
 		return nil, fmt.Errorf("openai knowledge base: query vector store: %w", err)
 	}
 
@@ -131,6 +188,8 @@ func (kb *OpenAIKnowledgeBase) Query(ctx context.Context, query string, topK int
 		}
 		chunks = append(chunks, chunk)
 	}
+	span.SetAttributes(attribute.Int("kb.result_count", len(chunks)))
+	span.SetStatus(codes.Ok, "")
 	return chunks, nil
 }
 
@@ -146,4 +205,9 @@ func (kb *OpenAIKnowledgeBase) Delete(ctx context.Context, docID string) error {
 		}
 	}
 	return nil
+}
+
+func recordKBError(span trace.Span, err error) {
+	span.RecordError(err)
+	span.SetStatus(codes.Error, err.Error())
 }

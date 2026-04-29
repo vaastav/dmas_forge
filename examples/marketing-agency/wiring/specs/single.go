@@ -6,6 +6,7 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/goproc"
 	"github.com/blueprint-uservices/blueprint/plugins/http"
 	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
+	"github.com/blueprint-uservices/blueprint/plugins/opentelemetry"
 )
 
 var Single = cmdbuilder.SpecOption{
@@ -19,9 +20,11 @@ func makeSingleSpec(spec wiring.WiringSpec) ([]string, error) {
 	if err != nil {
 		return []string{}, err
 	}
+	instrumentMarketingServices(spec, services)
 
 	http.Deploy(spec, services.coordinatorService)
-	goproc.Deploy(spec, services.coordinatorService)
+	proc := goproc.Deploy(spec, services.coordinatorService)
+	opentelemetry.Logger(spec, proc)
 	ctr := linuxcontainer.Deploy(spec, services.coordinatorService)
 
 	return []string{ctr}, nil

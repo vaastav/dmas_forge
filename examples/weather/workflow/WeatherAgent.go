@@ -8,7 +8,12 @@ import (
 
 	openai "github.com/openai/openai-go"
 	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
+
+const weatherToolTracerName = "github.com/vaastav/agentic_blueprint/examples/weather/workflow"
 
 type WeatherAgent interface {
 	Query(ctx context.Context, query string) (string, error)
@@ -61,18 +66,34 @@ func NewWeatherAgentImpl(ctx context.Context, agent core.Agent, disasterAgent Di
 }
 
 func toolHandler(ctx context.Context, toolcall openai.ChatCompletionMessageToolCall) (string, error) {
+	tracer := trace.SpanFromContext(ctx).TracerProvider().Tracer(weatherToolTracerName)
+	_, span := tracer.Start(ctx, "tool.weather.get",
+		trace.WithAttributes(
+			attribute.String("tool.name", toolcall.Function.Name),
+			attribute.String("provider_mode", "mock"),
+		),
+	)
+	defer span.End()
+
 	log.Println("Inside tool call")
 	if toolcall.Function.Name == "get_weather" {
 		log.Println("Tool Call into get_weather")
 		var args map[string]interface{}
 		err := json.Unmarshal([]byte(toolcall.Function.Arguments), &args)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return "", err
 		}
 		location := args["location"].(string)
+		span.SetAttributes(attribute.String("weather.location", location))
+		span.SetStatus(codes.Ok, "")
 		return "Weather in " + location + " is 30 degrees Celsius!", nil
 	}
-	return "Incorrect tool call oops!", errors.New("Unsupported tool call")
+	err := errors.New("Unsupported tool call")
+	span.RecordError(err)
+	span.SetStatus(codes.Error, err.Error())
+	return "Incorrect tool call oops!", err
 }
 
 func (a *WeatherAgentImpl) Query(ctx context.Context, query string) (string, error) {

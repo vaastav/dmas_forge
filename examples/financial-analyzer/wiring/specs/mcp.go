@@ -6,6 +6,7 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/goproc"
 	"github.com/blueprint-uservices/blueprint/plugins/http"
 	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
+	"github.com/blueprint-uservices/blueprint/plugins/opentelemetry"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/mcp"
 )
 
@@ -20,6 +21,7 @@ func makeMCPSpec(spec wiring.WiringSpec) ([]string, error) {
 	if err != nil {
 		return []string{}, err
 	}
+	instrumentFinancialServices(spec, services)
 
 	deployService := func(serviceName string, exposeHTTP bool) string {
 		if exposeHTTP {
@@ -27,7 +29,8 @@ func makeMCPSpec(spec wiring.WiringSpec) ([]string, error) {
 		} else {
 			mcp.Deploy(spec, serviceName)
 		}
-		goproc.Deploy(spec, serviceName)
+		proc := goproc.Deploy(spec, serviceName)
+		opentelemetry.Logger(spec, proc)
 		return linuxcontainer.Deploy(spec, serviceName)
 	}
 

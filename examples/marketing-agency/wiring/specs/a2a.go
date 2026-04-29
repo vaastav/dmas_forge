@@ -6,6 +6,7 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/goproc"
 	"github.com/blueprint-uservices/blueprint/plugins/http"
 	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
+	"github.com/blueprint-uservices/blueprint/plugins/opentelemetry"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/a2a"
 )
 
@@ -20,10 +21,12 @@ func makeA2ASpec(spec wiring.WiringSpec) ([]string, error) {
 	if err != nil {
 		return []string{}, err
 	}
+	instrumentMarketingServices(spec, services)
 
 	deployWithA2A := func(serviceName string) string {
 		a2a.Deploy(spec, serviceName)
-		goproc.Deploy(spec, serviceName)
+		proc := goproc.Deploy(spec, serviceName)
+		opentelemetry.Logger(spec, proc)
 		return linuxcontainer.Deploy(spec, serviceName)
 	}
 
@@ -33,7 +36,8 @@ func makeA2ASpec(spec wiring.WiringSpec) ([]string, error) {
 	logoCtr := deployWithA2A(services.logoService)
 
 	http.Deploy(spec, services.coordinatorService)
-	goproc.Deploy(spec, services.coordinatorService)
+	proc := goproc.Deploy(spec, services.coordinatorService)
+	opentelemetry.Logger(spec, proc)
 	coordinatorCtr := linuxcontainer.Deploy(spec, services.coordinatorService)
 
 	return []string{domainCtr, websiteCtr, marketingCtr, logoCtr, coordinatorCtr}, nil

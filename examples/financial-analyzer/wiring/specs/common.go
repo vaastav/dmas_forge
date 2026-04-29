@@ -4,6 +4,8 @@ import (
 	"flag"
 
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/wiring"
+	"github.com/blueprint-uservices/blueprint/plugins/jaeger"
+	"github.com/blueprint-uservices/blueprint/plugins/opentelemetry"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
 
 	"github.com/vaastav/agentic_blueprint/ai_plugins/model"
@@ -53,4 +55,15 @@ func defineFinancialServices(spec wiring.WiringSpec) (financialServices, error) 
 	)
 
 	return services, nil
+}
+
+func (s financialServices) all() []string {
+	return []string{s.collectorService, s.evaluatorService, s.researchService, s.analystService, s.writerService, s.coordinatorService}
+}
+
+func instrumentFinancialServices(spec wiring.WiringSpec, services financialServices) {
+	collector := jaeger.Collector(spec, "jaeger")
+	for _, serviceName := range services.all() {
+		opentelemetry.Instrument(spec, serviceName, collector)
+	}
 }

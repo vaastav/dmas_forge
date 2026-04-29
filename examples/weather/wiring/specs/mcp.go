@@ -5,7 +5,9 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/cmdbuilder"
 	"github.com/blueprint-uservices/blueprint/plugins/goproc"
 	"github.com/blueprint-uservices/blueprint/plugins/http"
+	"github.com/blueprint-uservices/blueprint/plugins/jaeger"
 	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
+	"github.com/blueprint-uservices/blueprint/plugins/opentelemetry"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/mcp"
 	"github.com/vaastav/agentic_blueprint/ai_plugins/model"
@@ -27,7 +29,8 @@ func makeMCPSpec(spec wiring.WiringSpec) ([]string, error) {
 		} else {
 			http.Deploy(spec, serviceName)
 		}
-		goproc.Deploy(spec, serviceName)
+		proc := goproc.Deploy(spec, serviceName)
+		opentelemetry.Logger(spec, proc)
 		return linuxcontainer.Deploy(spec, serviceName)
 	}
 
@@ -42,10 +45,15 @@ func makeMCPSpec(spec wiring.WiringSpec) ([]string, error) {
 
 	dagent := openai_plugin.OpenAILLMAgent(spec, "dagent", model_url, model_key, model_name, openai_plugin.AgentConfig{})
 	disaster_agent := workflow.Service[wf.DisasterAgent](spec, "dagent_service", dagent)
-	disaster_ctr := applyDockerDefaults(spec, disaster_agent, false)
 
 	wagent := openai_plugin.OpenAILLMAgent(spec, "wagent", model_url, model_key, model_name, openai_plugin.AgentConfig{})
 	weather_agent := workflow.Service[wf.WeatherAgent](spec, "wagent_service", wagent, disaster_agent)
+
+	collector := jaeger.Collector(spec, "jaeger")
+	opentelemetry.Instrument(spec, disaster_agent, collector)
+	opentelemetry.Instrument(spec, weather_agent, collector)
+
+	disaster_ctr := applyDockerDefaults(spec, disaster_agent, false)
 	weather_ctr := applyDockerDefaults(spec, weather_agent, true)
 
 	return []string{disaster_ctr, weather_ctr}, nil
