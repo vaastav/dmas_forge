@@ -82,6 +82,23 @@ func (mcpclient *{{$receiver}}) {{SignatureWithRetVars $f}} {
 	if err != nil {
 		return
 	}
+	if result == nil {
+		err = errors.New("mcp returned nil result")
+		return
+	}
+	if result.IsError {
+		err = errors.New("mcp tool returned error")
+		if len(result.Content) > 0 {
+			if content, ok := result.Content[0].(*mcp.TextContent); ok && content.Text != "" {
+				err = errors.New(content.Text)
+			}
+		}
+		return
+	}
+	if len(result.Content) < {{len $f.Returns}} {
+		err = errors.New("mcp response had too few content items")
+		return
+	}
 
 	// Parse the result
 	// Each return value corresponds to 1 piece of text content
