@@ -3,6 +3,7 @@ go 1.23.0
 use (
 	./ai_plugins
 	./ai_runtime
+	./benchmark
 	./examples/chat/wiring
 	./examples/chat/workflow
 	./examples/financial-analyzer/wiring

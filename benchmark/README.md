@@ -2,16 +2,16 @@
 
 Simple Go benchmark runner for the examples.
 
-Run from this directory:
+Run from the repository root:
 
 ```bash
-go run main.go -h
-go run main.go list
-go run main.go build -examples weather,chat -specs single,memory -rebuild
-go run main.go run -examples weather -specs single -profiles sequential
-go run main.go smoke -examples weather -specs single,http
-go run main.go summary -run <run-id>
-go run main.go jaeger -run <run-id> -case weather-single-sequential
+go run ./benchmark -h
+go run ./benchmark list
+go run ./benchmark build -examples weather,chat -specs single,memory -rebuild
+go run ./benchmark run -examples weather -specs single -profiles sequential
+go run ./benchmark smoke -examples weather -specs single,http
+go run ./benchmark summary -run <run-id>
+go run ./benchmark jaeger -run <run-id> -case weather-single-sequential
 ```
 
 Configure the model in `model.json`. Configure examples and request-count profiles in `config.json`.
