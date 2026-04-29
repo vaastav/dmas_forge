@@ -37,9 +37,9 @@ func printUsage(w io.Writer) {
 Run this from the repository root:
   go run benchmark/main.go -h
   go run benchmark/main.go list
-  go run benchmark/main.go build -examples weather,chat -specs single,memory -rebuild
+  go run benchmark/main.go build -examples weather,chat -specs single,memory
   go run benchmark/main.go run -examples weather -specs single,http
-  go run benchmark/main.go smoke -examples weather -specs single,http -rebuild
+  go run benchmark/main.go smoke -examples weather -specs single,http
   go run benchmark/main.go summary -run 20260429-120000
   go run benchmark/main.go jaeger -run 20260429-120000 -case weather-single-sequential
 
@@ -48,9 +48,9 @@ Or from the benchmark directory:
 
 Commands:
   list      Print configured examples, specs, query files, and profiles.
-  build     Generate cached builds under cached_builds/<example>/<spec>.
-  run       Build/reuse, start Docker Compose, run fixed-count load, save results.
-  smoke     Build/reuse, start Docker Compose, run one request per example/spec profile.
+  build     Generate deployment output under .builds/<example>/<spec>.
+  run       Generate builds, start Docker Compose, run fixed-count load, save results.
+  smoke     Generate builds, start Docker Compose, run one request per example/spec profile.
   summary   Print a compact table from saved summary.json files.
   jaeger    Start Jaeger UI over one saved case's jaeger/ directory.
 
@@ -59,6 +59,5 @@ Common flags:
   -examples   Comma-separated example names.
   -specs      Comma-separated spec names.
   -profiles   Comma-separated profile names.
-  -rebuild    Regenerate cached builds.
 `)
 }

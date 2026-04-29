@@ -9,9 +9,7 @@ import (
 )
 
 type caseOptions struct {
-	RepoRoot       string
 	BenchDir       string
-	ModelFile      string
 	ResultsRoot    string
 	CaseDir        string
 	BuildDir       string
@@ -19,7 +17,6 @@ type caseOptions struct {
 	Case           CasePlan
 	ProgressWriter io.Writer
 	DetailWriter   io.Writer
-	Rebuild        bool
 }
 
 type RunOptions struct {
@@ -29,7 +26,6 @@ type RunOptions struct {
 	Mock     bool
 	Cases    []CasePlan
 	RunInfo  any
-	Rebuild  bool
 	Stdout   io.Writer
 }
 
@@ -42,39 +38,56 @@ func Run(opts RunOptions) error {
 		return err
 	}
 
-	modelFile := filepath.Join(opts.BenchDir, "model.json")
+	buildLogPath := filepath.Join(resultsRoot, "build.log")
+	fmt.Fprintf(opts.Stdout, "generating deployment files\n")
+	fmt.Fprintf(opts.Stdout, "build logs: %s\n", buildLogPath)
+	buildLog, err := os.Create(buildLogPath)
+	if err != nil {
+		return err
+	}
+	buildErr := Build(BuildOptions{
+		RepoRoot:  opts.RepoRoot,
+		BenchDir:  opts.BenchDir,
+		Cases:     opts.Cases,
+		LogWriter: buildLog,
+	})
+	closeErr := buildLog.Close()
+	if buildErr != nil {
+		return buildErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+
 	for i, c := range opts.Cases {
 		caseName := caseName(c)
 		caseDir := filepath.Join(resultsRoot, caseName)
-		buildDir := filepath.Join(opts.BenchDir, "cached_builds", c.Example.Name, c.Spec)
 		if err := os.MkdirAll(caseDir, 0o755); err != nil {
 			return err
 		}
 
-		logFile, err := os.Create(filepath.Join(caseDir, "build.log"))
+		logPath := filepath.Join(caseDir, "build.log")
+		logFile, err := os.Create(logPath)
 		if err != nil {
 			return err
 		}
 		progressWriter := io.MultiWriter(opts.Stdout, logFile)
 		fmt.Fprintf(progressWriter, "[%d/%d] running %s/%s/%s\n", i+1, len(opts.Cases), c.Example.Name, c.Spec, c.Profile.Name)
-		fmt.Fprintf(progressWriter, "docker/build logs: %s\n", filepath.Join(caseDir, "build.log"))
+		fmt.Fprintf(progressWriter, "case logs: %s\n", logPath)
 
-		err = runCase(caseOptions{
-			RepoRoot:       opts.RepoRoot,
+		runErr := runCase(caseOptions{
 			BenchDir:       opts.BenchDir,
-			ModelFile:      modelFile,
 			ResultsRoot:    resultsRoot,
 			CaseDir:        caseDir,
-			BuildDir:       buildDir,
+			BuildDir:       generatedBuildDir(opts.BenchDir, c),
 			Mock:           opts.Mock,
 			Case:           c,
 			ProgressWriter: progressWriter,
 			DetailWriter:   logFile,
-			Rebuild:        opts.Rebuild,
 		})
 		closeErr := logFile.Close()
-		if err != nil {
-			return err
+		if runErr != nil {
+			return runErr
 		}
 		if closeErr != nil {
 			return closeErr
@@ -91,10 +104,7 @@ func runCase(opts caseOptions) error {
 	c := opts.Case
 	caseName := caseName(c)
 
-	fmt.Fprintf(opts.ProgressWriter, "building deployment files for %s\n", caseName)
-	if err := buildDeployment(opts.RepoRoot, opts.ModelFile, c.Example, c.Spec, opts.BuildDir, opts.DetailWriter, opts.Rebuild); err != nil {
-		return err
-	}
+	fmt.Fprintf(opts.ProgressWriter, "using generated deployment files for %s\n", caseName)
 	jaegerDir := filepath.Join(opts.CaseDir, "jaeger")
 	if err := prepareJaegerDir(jaegerDir); err != nil {
 		return err

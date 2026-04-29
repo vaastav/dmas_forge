@@ -12,7 +12,6 @@ type BuildOptions struct {
 	RepoRoot  string
 	BenchDir  string
 	Cases     []CasePlan
-	Rebuild   bool
 	LogWriter io.Writer
 }
 
@@ -25,24 +24,22 @@ func Build(opts BuildOptions) error {
 			continue
 		}
 		seen[key] = true
-		buildDir := filepath.Join(opts.BenchDir, "cached_builds", c.Example.Name, c.Spec)
-		fmt.Fprintf(opts.LogWriter, "building %s %s -> %s\n", c.Example.Name, c.Spec, buildDir)
-		if err := buildDeployment(opts.RepoRoot, modelFile, c.Example, c.Spec, buildDir, opts.LogWriter, opts.Rebuild); err != nil {
+		outDir := generatedBuildDir(opts.BenchDir, c)
+		fmt.Fprintf(opts.LogWriter, "generating %s %s -> %s\n", c.Example.Name, c.Spec, outDir)
+		if err := generateDeployment(opts.RepoRoot, modelFile, c.Example, c.Spec, outDir, opts.LogWriter); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func buildDeployment(repoRoot, modelFile string, ex ExampleConfig, spec string, outDir string, logWriter io.Writer, rebuild bool) error {
-	if _, err := os.Stat(filepath.Join(outDir, "docker", "docker-compose.yml")); err == nil && !rebuild {
-		fmt.Fprintf(logWriter, "using cached build %s\n", outDir)
-		return pinGeneratedOTelDeps(outDir, logWriter)
-	}
-	if rebuild {
-		if err := os.RemoveAll(outDir); err != nil {
-			return err
-		}
+func generatedBuildDir(benchDir string, c CasePlan) string {
+	return filepath.Join(benchDir, ".builds", c.Example.Name, c.Spec)
+}
+
+func generateDeployment(repoRoot, modelFile string, ex ExampleConfig, spec string, outDir string, logWriter io.Writer) error {
+	if err := os.RemoveAll(outDir); err != nil {
+		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(outDir), 0o755); err != nil {
 		return err

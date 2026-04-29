@@ -16,9 +16,8 @@ func commandBuild(args []string) error {
 	configPath := fs.String("config", "config.json", "config file")
 	exampleFilter := fs.String("examples", "", "comma-separated example names")
 	specFilter := fs.String("specs", "", "comma-separated spec names")
-	rebuild := fs.Bool("rebuild", false, "regenerate cached builds")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: go run benchmark/main.go build [-examples weather,chat] [-specs single,memory] [-rebuild]")
+		fmt.Fprintln(fs.Output(), "Usage: go run benchmark/main.go build [-examples weather,chat] [-specs single,memory]")
 	}
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -44,7 +43,6 @@ func commandBuild(args []string) error {
 		RepoRoot:  repoRoot,
 		BenchDir:  benchDir,
 		Cases:     cases,
-		Rebuild:   *rebuild,
 		LogWriter: os.Stdout,
 	})
 }
