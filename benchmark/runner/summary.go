@@ -16,7 +16,7 @@ func commandSummary(args []string) error {
 	runID := fs.String("run", "", "run id under results")
 	resultsDir := fs.String("results", "results", "results directory")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: go run ./benchmark summary [-run run-id]")
+		fmt.Fprintln(fs.Output(), "Usage: go run benchmark/main.go summary [-run run-id]")
 	}
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {

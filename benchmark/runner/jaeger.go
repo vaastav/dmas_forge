@@ -18,7 +18,7 @@ func commandJaeger(args []string) error {
 	port := fs.Int("port", 16686, "host port for Jaeger UI")
 	resultsDir := fs.String("results", "results", "results directory")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: go run ./benchmark jaeger -run run-id -case weather-single-sequential [-port 16686]")
+		fmt.Fprintln(fs.Output(), "Usage: go run benchmark/main.go jaeger -run run-id -case weather-single-sequential [-port 16686]")
 	}
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {

@@ -14,7 +14,7 @@ func commandList(args []string) error {
 	fs.SetOutput(os.Stdout)
 	configPath := fs.String("config", "config.json", "config file")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "Usage: go run ./benchmark list [-config config.json]")
+		fmt.Fprintln(fs.Output(), "Usage: go run benchmark/main.go list [-config config.json]")
 	}
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {

@@ -24,7 +24,7 @@ func commandRun(args []string, smoke bool) error {
 	profileFilter := fs.String("profiles", "", "comma-separated profile names")
 	runID := fs.String("run-id", time.Now().Format("20060102-150405"), "result run id")
 	rebuild := fs.Bool("rebuild", false, "regenerate cached builds")
-	usage := fmt.Sprintf("Usage: go run ./benchmark %s [-examples weather] [-specs single,http] [-profiles sequential] [-run-id local] [-rebuild]", commandName)
+	usage := fmt.Sprintf("Usage: go run benchmark/main.go %s [-examples weather] [-specs single,http] [-profiles sequential] [-run-id local] [-rebuild]", commandName)
 	fs.Usage = func() {
 		fmt.Fprintln(fs.Output(), usage)
 	}
