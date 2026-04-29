@@ -5,20 +5,31 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	openai "github.com/openai/openai-go"
 	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
+
+const mcpBridgeTracerName = "github.com/vaastav/agentic_blueprint/examples/financial-analyzer/workflow/mcp_bridge"
 
 type MCPToolBridge struct {
 	sessions  []*mcp.ClientSession
 	toolToIdx map[string]int
 	tools     map[string]openai.ChatCompletionToolParam
+	mock      bool
 }
 
 func NewMCPToolBridge(ctx context.Context, serverURLs []string) (*MCPToolBridge, error) {
+	if os.Getenv("DMAS_BENCH_MOCK") == "1" {
+		return newMockMCPToolBridge(), nil
+	}
+
 	b := &MCPToolBridge{
 		toolToIdx: make(map[string]int),
 		tools:     make(map[string]openai.ChatCompletionToolParam),
@@ -33,26 +44,42 @@ func NewMCPToolBridge(ctx context.Context, serverURLs []string) (*MCPToolBridge,
 		if url == "" {
 			continue
 		}
+		tracer := trace.SpanFromContext(ctx).TracerProvider().Tracer(mcpBridgeTracerName)
+		serverCtx, span := tracer.Start(ctx, "mcp.discovery",
+			trace.WithAttributes(
+				attribute.String("mcp.server_url", url),
+				attribute.String("provider_mode", "external"),
+			),
+		)
 
 		client := mcp.NewClient(&mcp.Implementation{
 			Name:    "financial-analyzer-mcp-bridge",
 			Version: "1.0.0",
 		}, nil)
 
-		session, err := client.Connect(ctx, &mcp.StreamableClientTransport{
+		session, err := client.Connect(serverCtx, &mcp.StreamableClientTransport{
 			Endpoint: url,
 		}, nil)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			span.End()
 			log.Printf("MCP bridge: failed to connect to server %s: %v", url, err)
 			continue
 		}
 
-		result, err := session.ListTools(ctx, nil)
+		result, err := session.ListTools(serverCtx, nil)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			span.End()
 			log.Printf("MCP bridge: failed to list tools from %s: %v", url, err)
 			_ = session.Close()
 			continue
 		}
+		span.SetAttributes(attribute.Int("mcp.tool_count", len(result.Tools)))
+		span.SetStatus(codes.Ok, "")
+		span.End()
 
 		idx := len(b.sessions)
 		b.sessions = append(b.sessions, session)
@@ -87,14 +114,38 @@ func (b *MCPToolBridge) AddToolsToAgent(ctx context.Context, agent core.Agent) e
 }
 
 func (b *MCPToolBridge) HandleToolCall(ctx context.Context, tc openai.ChatCompletionMessageToolCall) (string, error) {
+	tracer := trace.SpanFromContext(ctx).TracerProvider().Tracer(mcpBridgeTracerName)
+	ctx, span := tracer.Start(ctx, "mcp.tool_call",
+		trace.WithAttributes(
+			attribute.String("tool.name", tc.Function.Name),
+			attribute.String("provider_mode", b.providerMode()),
+		),
+	)
+	defer span.End()
+
+	if b.mock {
+		out, err := b.handleMockToolCall(tc)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return "", err
+		}
+		span.SetStatus(codes.Ok, "")
+		return out, nil
+	}
+
 	idx, ok := b.toolToIdx[tc.Function.Name]
 	if !ok {
+		span.SetStatus(codes.Error, "tool not found")
 		return fmt.Sprintf("Error: tool %q not found in MCP bridge", tc.Function.Name), nil
 	}
+	span.SetAttributes(attribute.Int("mcp.session_index", idx))
 
 	var args map[string]any
 	if tc.Function.Arguments != "" {
 		if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return "", fmt.Errorf("parsing tool call arguments for %q: %w", tc.Function.Name, err)
 		}
 	}
@@ -107,6 +158,8 @@ func (b *MCPToolBridge) HandleToolCall(ctx context.Context, tc openai.ChatComple
 		Arguments: args,
 	})
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return fmt.Sprintf("Error calling MCP tool %q: %v", tc.Function.Name, err), nil
 	}
 
@@ -122,7 +175,11 @@ func (b *MCPToolBridge) HandleToolCall(ctx context.Context, tc openai.ChatComple
 	output := strings.Join(parts, "\n")
 	if result.IsError && output != "" {
 		output = "Error from MCP server: " + output
+		span.SetStatus(codes.Error, "mcp tool returned error")
+	} else {
+		span.SetStatus(codes.Ok, "")
 	}
+	span.SetAttributes(attribute.Bool("mcp.tool_is_error", result.IsError))
 	return output, nil
 }
 
@@ -134,6 +191,94 @@ func (b *MCPToolBridge) Close() error {
 		}
 	}
 	return firstErr
+}
+
+func (b *MCPToolBridge) providerMode() string {
+	if b.mock {
+		return "mock"
+	}
+	return "external"
+}
+
+func newMockMCPToolBridge() *MCPToolBridge {
+	return &MCPToolBridge{
+		mock: true,
+		tools: map[string]openai.ChatCompletionToolParam{
+			"search_web": mockMCPTool("search_web", "Return deterministic benchmark financial search results.", "query"),
+			"fetch_url":  mockMCPTool("fetch_url", "Return deterministic benchmark page content.", "url"),
+		},
+		toolToIdx: map[string]int{},
+	}
+}
+
+func mockMCPTool(name, description, required string) openai.ChatCompletionToolParam {
+	return openai.ChatCompletionToolParam{
+		Function: openai.FunctionDefinitionParam{
+			Name:        name,
+			Description: openai.String(description),
+			Parameters: openai.FunctionParameters{
+				"type": "object",
+				"properties": map[string]any{
+					required: map[string]any{"type": "string"},
+				},
+				"required": []string{required},
+			},
+		},
+	}
+}
+
+func (b *MCPToolBridge) handleMockToolCall(tc openai.ChatCompletionMessageToolCall) (string, error) {
+	var args map[string]string
+	if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+		return "", err
+	}
+	switch tc.Function.Name {
+	case "search_web":
+		return mockFinancialSearch(args["query"]), nil
+	case "fetch_url":
+		return mockFinancialFetch(args["url"]), nil
+	default:
+		return "", fmt.Errorf("unknown mock MCP tool: %s", tc.Function.Name)
+	}
+}
+
+type mockCompanyProfile struct {
+	Name      string
+	Ticker    string
+	Price     string
+	MarketCap string
+	Revenue   string
+	NetIncome string
+	Summary   string
+}
+
+var mockProfiles = []mockCompanyProfile{
+	{Name: "Apple", Ticker: "AAPL", Price: "$212.47", MarketCap: "$3.2T", Revenue: "$391.0B trailing twelve months", NetIncome: "$96.9B trailing twelve months", Summary: "Apple combines large-scale consumer hardware with high-margin services revenue."},
+	{Name: "Microsoft", Ticker: "MSFT", Price: "$468.12", MarketCap: "$3.5T", Revenue: "$261.8B trailing twelve months", NetIncome: "$96.5B trailing twelve months", Summary: "Microsoft combines enterprise software cash flows with cloud and AI platform growth."},
+	{Name: "NVIDIA", Ticker: "NVDA", Price: "$128.44", MarketCap: "$3.1T", Revenue: "$130.5B trailing twelve months", NetIncome: "$72.9B trailing twelve months", Summary: "NVIDIA is driven by accelerated computing and data-center GPU demand."},
+}
+
+func mockFinancialSearch(query string) string {
+	p := matchMockProfile(query)
+	slug := strings.ToLower(strings.ReplaceAll(p.Name, " ", "-"))
+	return fmt.Sprintf("1. %s overview\nURL: https://benchmark.mock/%s/overview\nSummary: %s\n\n2. %s financials\nURL: https://benchmark.mock/%s/financials\nSummary: Price %s, market cap %s, revenue %s, net income %s.\n\n3. %s outlook\nURL: https://benchmark.mock/%s/outlook\nSummary: Current operating context and investment watchpoints for %s.",
+		p.Name, slug, p.Summary, p.Name, slug, p.Price, p.MarketCap, p.Revenue, p.NetIncome, p.Name, slug, p.Name)
+}
+
+func mockFinancialFetch(url string) string {
+	p := matchMockProfile(url)
+	return fmt.Sprintf("# %s mock source\n\n- Source: Benchmark Mock Finance Feed\n- Ticker: %s\n- Current price: %s\n- Market cap: %s\n- Revenue: %s\n- Net income: %s\n\n## Summary\n%s",
+		p.Name, p.Ticker, p.Price, p.MarketCap, p.Revenue, p.NetIncome, p.Summary)
+}
+
+func matchMockProfile(value string) mockCompanyProfile {
+	lower := strings.ToLower(value)
+	for _, p := range mockProfiles {
+		if strings.Contains(lower, strings.ToLower(p.Name)) || strings.Contains(lower, strings.ToLower(p.Ticker)) {
+			return p
+		}
+	}
+	return mockCompanyProfile{Name: "Example Company", Ticker: "EXM", Price: "$100.00", MarketCap: "$100B", Revenue: "$10B trailing twelve months", NetIncome: "$2B trailing twelve months", Summary: "Fallback mock profile used when the query does not match a benchmark fixture company."}
 }
 
 func mcpToolToOpenAI(tool *mcp.Tool) (openai.ChatCompletionToolParam, error) {
