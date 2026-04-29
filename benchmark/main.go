@@ -21,6 +21,8 @@ import (
 	"time"
 )
 
+const jaegerImage = "jaegertracing/all-in-one:1.75.0"
+
 type Config struct {
 	Mock     bool            `json:"mock"`
 	Profiles []Profile       `json:"profiles"`
@@ -59,6 +61,7 @@ type RequestResult struct {
 	LatencyMS     float64 `json:"latency_ms"`
 	ResponseBytes int     `json:"response_bytes"`
 	Error         string  `json:"error"`
+	ResponseText  string  `json:"response_text,omitempty"`
 	URL           string  `json:"url"`
 }
 
@@ -312,13 +315,7 @@ func runCase(repoRoot, benchDir, modelFile, resultsRoot, caseDir, buildDir, case
 		return err
 	}
 	jaegerDir := filepath.Join(caseDir, "jaeger")
-	if err := os.MkdirAll(jaegerDir, 0o755); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Join(jaegerDir, "data"), 0o755); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Join(jaegerDir, "key"), 0o755); err != nil {
+	if err := prepareJaegerDir(jaegerDir); err != nil {
 		return err
 	}
 	overrideFile, err := writeComposeOverride(buildDir, jaegerDir, mock)
@@ -330,6 +327,7 @@ func runCase(repoRoot, benchDir, modelFile, resultsRoot, caseDir, buildDir, case
 	_ = composeDown(buildDir, overrideFile, project, detailWriter)
 	defer func() {
 		fmt.Fprintf(progressWriter, "stopping containers for %s\n", caseName)
+		dumpComposeDiagnostics(buildDir, overrideFile, project, detailWriter)
 		composeDown(buildDir, overrideFile, project, detailWriter)
 	}()
 
@@ -352,6 +350,9 @@ func runCase(repoRoot, benchDir, modelFile, resultsRoot, caseDir, buildDir, case
 		return err
 	}
 	if err := waitTCP("localhost", httpPort, 120*time.Second); err != nil {
+		return err
+	}
+	if err := waitTCP("localhost", jaegerPort, 120*time.Second); err != nil {
 		return err
 	}
 
@@ -456,16 +457,20 @@ func commandJaeger(args []string) error {
 	if _, err := os.Stat(jaegerDir); err != nil {
 		return err
 	}
+	if err := prepareJaegerDir(jaegerDir); err != nil {
+		return err
+	}
 	fmt.Printf("Jaeger UI: http://localhost:%d\n", *port)
 	cmd := exec.Command(
 		"docker", "run", "--rm",
+		"--user", "0:0",
 		"-p", fmt.Sprintf("%d:16686", *port),
 		"-e", "SPAN_STORAGE_TYPE=badger",
 		"-e", "BADGER_EPHEMERAL=false",
 		"-e", "BADGER_DIRECTORY_VALUE=/badger/data",
 		"-e", "BADGER_DIRECTORY_KEY=/badger/key",
 		"-v", jaegerDir+":/badger",
-		"jaegertracing/all-in-one:latest",
+		jaegerImage,
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -606,8 +611,10 @@ func writeComposeOverride(buildDir, jaegerDir string, mock bool) (string, error)
 	}
 	override := filepath.Join(buildDir, "docker", "benchmark.override.yml")
 	var b strings.Builder
-	b.WriteString("version: '3'\nservices:\n")
+	b.WriteString("services:\n")
 	b.WriteString("  jaeger_ctr:\n")
+	b.WriteString(fmt.Sprintf("    image: %s\n", jaegerImage))
+	b.WriteString("    user: \"0:0\"\n")
 	b.WriteString("    environment:\n")
 	b.WriteString("      SPAN_STORAGE_TYPE: badger\n")
 	b.WriteString("      BADGER_EPHEMERAL: \"false\"\n")
@@ -626,6 +633,18 @@ func writeComposeOverride(buildDir, jaegerDir string, mock bool) (string, error)
 		}
 	}
 	return override, os.WriteFile(override, []byte(b.String()), 0o644)
+}
+
+func prepareJaegerDir(jaegerDir string) error {
+	for _, dir := range []string{jaegerDir, filepath.Join(jaegerDir, "data"), filepath.Join(jaegerDir, "key")} {
+		if err := os.MkdirAll(dir, 0o777); err != nil {
+			return err
+		}
+		if err := os.Chmod(dir, 0o777); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func parseComposeServices(path string) ([]string, error) {
@@ -669,6 +688,13 @@ func composeDown(buildDir, overrideFile, project string, logWriter io.Writer) er
 	cmd.Stderr = logWriter
 	_ = cmd.Run()
 	return nil
+}
+
+func dumpComposeDiagnostics(buildDir, overrideFile, project string, logWriter io.Writer) {
+	fmt.Fprintln(logWriter, "\n--- docker compose ps ---")
+	_ = runCommand(composeCommand(buildDir, overrideFile, project, "ps"), filepath.Join(buildDir, "docker"), logWriter)
+	fmt.Fprintln(logWriter, "\n--- docker compose logs ---")
+	_ = runCommand(composeCommand(buildDir, overrideFile, project, "logs", "--no-color"), filepath.Join(buildDir, "docker"), logWriter)
 }
 
 func composeProjectName(runID, caseName string) string {
@@ -865,6 +891,7 @@ func sendOne(client *http.Client, reqURL string, c CasePlan, row QueryRow, seq i
 	status := 0
 	size := 0
 	errText := ""
+	responseText := ""
 	resp, err := client.Get(reqURL)
 	if err != nil {
 		errText = err.Error()
@@ -875,6 +902,12 @@ func sendOne(client *http.Client, reqURL string, c CasePlan, row QueryRow, seq i
 		size = len(body)
 		if readErr != nil {
 			errText = readErr.Error()
+		}
+		if status < 200 || status >= 300 {
+			responseText = trimResponseText(string(body))
+			if errText == "" {
+				errText = responseText
+			}
 		}
 	}
 	latency := float64(time.Since(start).Microseconds()) / 1000.0
@@ -889,11 +922,37 @@ func sendOne(client *http.Client, reqURL string, c CasePlan, row QueryRow, seq i
 		LatencyMS:     latency,
 		ResponseBytes: size,
 		Error:         errText,
+		ResponseText:  responseText,
 		URL:           reqURL,
 	}
 }
 
+func trimResponseText(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) <= 2048 {
+		return value
+	}
+	return value[:2048] + "...<truncated>"
+}
+
 func collectTraces(baseURL string, start, end time.Time) ([]map[string]any, error) {
+	deadline := time.Now().Add(30 * time.Second)
+	var traces []map[string]any
+	var lastErr error
+	for time.Now().Before(deadline) {
+		traces, lastErr = collectTracesOnce(baseURL, start, end)
+		if lastErr == nil && len(traces) > 0 {
+			return traces, nil
+		}
+		if lastErr == nil {
+			lastErr = fmt.Errorf("no traces returned")
+		}
+		time.Sleep(time.Second)
+	}
+	return traces, lastErr
+}
+
+func collectTracesOnce(baseURL string, start, end time.Time) ([]map[string]any, error) {
 	servicesPayload, err := fetchJSON(baseURL + "/api/services")
 	if err != nil {
 		return nil, err
@@ -1048,21 +1107,41 @@ func summarizeCase(c CasePlan, results []RequestResult, spans []map[string]any, 
 }
 
 func printCaseSummary(s CaseSummary) {
-	fmt.Printf("%s %s %s requests=%d ok=%d errors=%d throughput=%.2f/s p50=%.0fms p95=%.0fms p99=%.0fms tokens=%d\n",
-		s.Example, s.Spec, s.Profile, s.Requests, s.Successes, s.Errors, s.ThroughputRPS, s.P50MS, s.P95MS, s.P99MS, s.TotalTokens)
+	fmt.Printf("%s %s %s status=%s requests=%d ok=%d errors=%d throughput=%.2f/s p50=%.0fms p95=%.0fms p99=%.0fms tokens=%d trace=%s\n",
+		s.Example, s.Spec, s.Profile, summaryStatus(s), s.Requests, s.Successes, s.Errors, s.ThroughputRPS, s.P50MS, s.P95MS, s.P99MS, s.TotalTokens, traceStatus(s))
 	for _, comp := range s.Components {
 		if comp.Name == "llm.call" || comp.TotalTokens > 0 || strings.HasPrefix(comp.Name, "tool.") || strings.Contains(comp.Name, "mcp") || strings.Contains(comp.Name, "kb.") {
 			fmt.Printf("  %-24s %4d spans %9.0fms %8d tokens\n", comp.Name, comp.Spans, comp.DurationMS, comp.TotalTokens)
 		}
 	}
+	if s.TraceError != "" {
+		fmt.Printf("  trace error: %s\n", s.TraceError)
+	}
 }
 
 func printSummaryTable(summaries []CaseSummary) {
-	fmt.Println("example spec profile requests ok errors throughput p50 p95 p99 tokens")
+	fmt.Println("example spec profile status requests ok errors throughput p50 p95 p99 tokens trace")
 	for _, s := range summaries {
-		fmt.Printf("%s %s %s %d %d %d %.2f/s %.0fms %.0fms %.0fms %d\n",
-			s.Example, s.Spec, s.Profile, s.Requests, s.Successes, s.Errors, s.ThroughputRPS, s.P50MS, s.P95MS, s.P99MS, s.TotalTokens)
+		fmt.Printf("%s %s %s %s %d %d %d %.2f/s %.0fms %.0fms %.0fms %d %s\n",
+			s.Example, s.Spec, s.Profile, summaryStatus(s), s.Requests, s.Successes, s.Errors, s.ThroughputRPS, s.P50MS, s.P95MS, s.P99MS, s.TotalTokens, traceStatus(s))
 	}
+}
+
+func summaryStatus(s CaseSummary) string {
+	if s.Requests > 0 && s.Successes == 0 {
+		return "failed"
+	}
+	if s.Errors > 0 {
+		return "partial"
+	}
+	return "ok"
+}
+
+func traceStatus(s CaseSummary) string {
+	if s.TraceError != "" {
+		return "error"
+	}
+	return "ok"
 }
 
 func percentile(values []float64, pct float64) float64 {
