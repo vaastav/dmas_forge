@@ -40,41 +40,33 @@ Profiles control load:
 
 ## Quick Start
 
-Run from the repository root:
-
-```bash
-go run benchmark/main.go list
-go run benchmark/main.go smoke -examples weather -specs single -profiles sequential
-go run benchmark/main.go run -examples weather -specs single -profiles sequential
-go run benchmark/main.go summary
-```
-
-Or from this directory:
-
 ```bash
 go run main.go list
+go run main.go smoke -examples weather -specs single -profiles sequential
+go run main.go run -examples weather -specs single -profiles sequential
+go run main.go summary
 ```
 
 ## Common Commands
 
 ```bash
 # Show configured examples, specs, query files, and profiles.
-go run benchmark/main.go list
+go run main.go list
 
-# Build deployments only.
-go run benchmark/main.go build -examples weather,chat -specs single,memory -rebuild
+# Generate deployments only.
+go run main.go build -examples weather,chat -specs single,memory
 
 # Run one request per selected case.
-go run benchmark/main.go smoke -examples weather -specs single,http -rebuild
+go run main.go smoke -examples weather -specs single,http
 
 # Run the selected benchmark cases.
-go run benchmark/main.go run -examples weather -specs single -profiles sequential
+go run main.go run -examples weather -specs single -profiles sequential
 
 # Print a saved run summary. Without -run, this uses the latest run.
-go run benchmark/main.go summary -run <run-id>
+go run main.go summary -run <run-id>
 
 # Open Jaeger for one saved case.
-go run benchmark/main.go jaeger -run <run-id> -case weather-single-sequential
+go run main.go jaeger -run <run-id> -case weather-single-sequential
 ```
 
 Use `-examples`, `-specs`, and `-profiles` to keep runs small while testing.
@@ -83,7 +75,7 @@ Use `-examples`, `-specs`, and `-profiles` to keep runs small while testing.
 
 1. Reads cases from `config.json`.
 2. Reads model settings from `model.json`.
-3. Builds selected example/spec deployments into `cached_builds/`.
+3. Generates selected example/spec deployments into `.builds/`.
 4. Starts one Docker Compose case at a time.
 5. Adds Jaeger tracing for the run.
 6. Sends requests from `queries/<example>.csv`.
@@ -95,10 +87,10 @@ The runner cycles through query rows until the selected profile's request count 
 
 ## Results
 
-Builds are cached here:
+Generated builds are written here:
 
 ```text
-benchmark/cached_builds/<example>/<spec>/
+benchmark/.builds/<example>/<spec>/
 ```
 
 Runs are saved here:
@@ -116,7 +108,7 @@ benchmark/results/<run-id>/<example>-<spec>-<profile>/
 Important files:
 
 ```text
-build.log        Docker and build logs
+build.log        Docker and case logs
 requests.jsonl   One row per HTTP request
 resources.jsonl  Docker CPU and memory samples
 traces.json      Raw Jaeger traces
@@ -125,7 +117,7 @@ summary.json     Latency, errors, throughput, tokens, CPU, memory
 jaeger/          Saved Jaeger storage
 ```
 
-The run folder also includes `run.json`, which records the config and model name/url used for the run. The model key is not saved.
+The run folder also includes `run.json`, which records the config and model name/url used for the run. The model key is not saved. Deployment generation logs are written to the run folder's top-level `build.log`.
 
 ## Config Files
 
