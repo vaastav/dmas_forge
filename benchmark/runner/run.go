@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -43,6 +44,15 @@ func commandRun(args []string, smoke bool) error {
 	if err != nil {
 		return err
 	}
+	modelInfo := map[string]any{}
+	modelBytes, err := os.ReadFile(filepath.Join(benchDir, "model.json"))
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(modelBytes, &modelInfo); err != nil {
+		return err
+	}
+	delete(modelInfo, "key")
 	examples := splitCSV(*exampleFilter)
 	specs := splitCSV(*specFilter)
 	profiles := splitCSV(*profileFilter)
@@ -73,6 +83,7 @@ func commandRun(args []string, smoke bool) error {
 			"specs":    specs,
 			"profiles": profiles,
 			"config":   cfg,
+			"model":    modelInfo,
 		},
 	})
 }
