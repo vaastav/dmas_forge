@@ -4,7 +4,8 @@ import "time"
 
 type Profile struct {
 	Name           string `json:"name"`
-	Requests       int    `json:"requests"`
+	Mode           string `json:"mode"`
+	Value          int    `json:"value"`
 	Concurrency    int    `json:"concurrency"`
 	TimeoutSeconds int    `json:"timeout_seconds"`
 }

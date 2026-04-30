@@ -61,7 +61,8 @@ func commandRun(args []string, smoke bool) error {
 	}
 	if smoke {
 		for i := range cases {
-			cases[i].Profile.Requests = 1
+			cases[i].Profile.Mode = "requests"
+			cases[i].Profile.Value = 1
 			cases[i].Profile.Concurrency = 1
 		}
 	}

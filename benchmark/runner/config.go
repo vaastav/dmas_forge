@@ -21,8 +21,38 @@ func loadConfig(path string) (config, error) {
 	if err != nil {
 		return cfg, err
 	}
-	err = json.Unmarshal(b, &cfg)
-	return cfg, err
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		return cfg, err
+	}
+	return cfg, validateConfig(cfg)
+}
+
+func validateConfig(cfg config) error {
+	for _, profile := range cfg.Profiles {
+		if err := validateProfile("default", profile); err != nil {
+			return err
+		}
+	}
+	for _, ex := range cfg.Examples {
+		for _, profile := range ex.Profiles {
+			if err := validateProfile(ex.Name, profile); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateProfile(source string, profile execute.Profile) error {
+	switch profile.Mode {
+	case "requests", "timed":
+	default:
+		return fmt.Errorf("%s profile %q has unsupported mode %q", source, profile.Name, profile.Mode)
+	}
+	if profile.Value < 1 {
+		return fmt.Errorf("%s profile %q value must be at least 1", source, profile.Name)
+	}
+	return nil
 }
 
 func selectCases(cfg config, examples, specs, profiles map[string]bool) []execute.CasePlan {
@@ -59,5 +89,5 @@ func profileNames(profiles []execute.Profile) string {
 }
 
 func printProfile(profile execute.Profile) {
-	fmt.Printf("  %-12s requests=%d concurrency=%d timeout=%ds\n", profile.Name, profile.Requests, profile.Concurrency, profile.TimeoutSeconds)
+	fmt.Printf("  %-12s mode=%s value=%d concurrency=%d timeout=%ds\n", profile.Name, profile.Mode, profile.Value, profile.Concurrency, profile.TimeoutSeconds)
 }

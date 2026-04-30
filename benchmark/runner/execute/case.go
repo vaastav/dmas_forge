@@ -158,7 +158,7 @@ func runCase(opts caseOptions) error {
 		return err
 	}
 	endpoint := fmt.Sprintf("http://localhost:%d%s", httpPort, c.Example.Route)
-	fmt.Fprintf(opts.ProgressWriter, "testing load %s requests=%d concurrency=%d endpoint=%s\n", c.Profile.Name, c.Profile.Requests, c.Profile.Concurrency, endpoint)
+	fmt.Fprintf(opts.ProgressWriter, "testing load %s mode=%s value=%d concurrency=%d endpoint=%s\n", c.Profile.Name, c.Profile.Mode, c.Profile.Value, c.Profile.Concurrency, endpoint)
 	resourceContainers, resourceErr := listBenchmarkContainers(project)
 	if resourceErr != nil {
 		fmt.Fprintf(opts.ProgressWriter, "resource sampling error: %v\n", resourceErr)

@@ -45,16 +45,25 @@ func loadQueries(path string) ([]queryRow, error) {
 }
 
 func runLoad(endpoint string, c CasePlan, rows []queryRow) []requestResult {
-	total := c.Profile.Requests
 	concurrency := c.Profile.Concurrency
 	if concurrency < 1 {
 		concurrency = 1
 	}
+	capacity := 0
+	if c.Profile.Mode == "requests" {
+		capacity = c.Profile.Value
+	}
 	jobs := make(chan int)
-	results := make([]requestResult, 0, total)
+	results := make([]requestResult, 0, capacity)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	client := &http.Client{Timeout: time.Duration(c.Profile.TimeoutSeconds) * time.Second}
+	finish := func() []requestResult {
+		close(jobs)
+		wg.Wait()
+		sort.Slice(results, func(i, j int) bool { return results[i].Sequence < results[j].Sequence })
+		return results
+	}
 
 	for worker := 0; worker < concurrency; worker++ {
 		wg.Add(1)
@@ -70,13 +79,22 @@ func runLoad(endpoint string, c CasePlan, rows []queryRow) []requestResult {
 			}
 		}()
 	}
-	for seq := 0; seq < total; seq++ {
-		jobs <- seq
+	switch c.Profile.Mode {
+	case "requests":
+		for seq := 0; seq < c.Profile.Value; seq++ {
+			jobs <- seq
+		}
+	case "timed":
+		timer := time.NewTimer(time.Duration(c.Profile.Value) * time.Second)
+		for seq := 0; ; seq++ {
+			select {
+			case jobs <- seq:
+			case <-timer.C:
+				return finish()
+			}
+		}
 	}
-	close(jobs)
-	wg.Wait()
-	sort.Slice(results, func(i, j int) bool { return results[i].Sequence < results[j].Sequence })
-	return results
+	return finish()
 }
 
 func buildRequestURL(endpoint string, ex ExampleConfig, row queryRow) string {
