@@ -1,0 +1,4 @@
+# Generated artifacts and local environment
+.venv/
+out/
+**/__pycache__/
