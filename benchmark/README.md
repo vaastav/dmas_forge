@@ -38,6 +38,11 @@ Profiles control load:
 - `light`: small concurrent run
 - `heavy`: larger concurrent run
 
+Each profile uses `mode` and `value`:
+
+- `mode: "requests"` runs exactly `value` requests
+- `mode: "timed"` runs for `value` seconds, then waits for in-flight requests to finish
+
 ## Quick Start
 
 ```bash
@@ -83,7 +88,7 @@ Use `-examples`, `-specs`, and `-profiles` to keep runs small while testing.
 8. Saves raw data and a summary under `results/`.
 9. Stops containers before moving to the next case.
 
-The runner cycles through query rows until the selected profile's request count is reached.
+The runner cycles through query rows until the selected profile's request count or timed window is reached.
 
 ## Results
 
