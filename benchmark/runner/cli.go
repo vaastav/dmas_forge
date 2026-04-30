@@ -34,17 +34,14 @@ func Run(args []string) error {
 func printUsage(w io.Writer) {
 	fmt.Fprint(w, `DMAS Forge benchmark runner
 
-Run this from the repository root:
-  go run benchmark/main.go -h
-  go run benchmark/main.go list
-  go run benchmark/main.go build -examples weather,chat -specs single,memory
-  go run benchmark/main.go run -examples weather -specs single,http
-  go run benchmark/main.go smoke -examples weather -specs single,http
-  go run benchmark/main.go summary -run 20260429-120000
-  go run benchmark/main.go jaeger -run 20260429-120000 -case weather-single-sequential
-
-Or from the benchmark directory:
+Example Usage:
+  go run main.go -h
   go run main.go list
+  go run main.go build -examples weather,chat -specs single,memory
+  go run main.go run -examples weather -specs single,http
+  go run main.go smoke -examples weather -specs single,http
+  go run main.go summary -run 20260429-120000
+  go run main.go jaeger -run 20260429-120000 -case weather-single-sequential
 
 Commands:
   list      Print configured examples, specs, query files, and profiles.
