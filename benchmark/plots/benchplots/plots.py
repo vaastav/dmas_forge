@@ -95,34 +95,6 @@ def _overview_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) ->
     ax.set_ylabel("")
     _save(fig, out_dir / "overview" / "success_rate_heatmap.png", index, "overview", "Success-rate heatmap")
 
-    inventory = expected.groupby(["example", "spec"], observed=True)["present"].sum().reset_index(name="cases")
-    fig, ax = plt.subplots(figsize=(10, 5.5))
-    sns.barplot(data=inventory, x="example", y="cases", hue="spec", ax=ax, palette="deep")
-    ax.set_title("Present Cases by Example and Spec", loc="left", pad=14)
-    ax.set_xlabel("")
-    ax.set_ylabel("case count")
-    ax.tick_params(axis="x", rotation=15)
-    _outside_legend(ax, "Spec")
-    _save(fig, out_dir / "overview" / "case_inventory.png", index, "overview", "Case inventory")
-
-    kpis = pd.DataFrame(
-        [
-            {"metric": "Requests", "value": cases["requests"].sum()},
-            {"metric": "Successes", "value": cases["successes"].sum()},
-            {"metric": "Failures", "value": cases["errors"].sum()},
-            {"metric": "Tokens", "value": cases["total_tokens"].sum()},
-            {"metric": "Peak p95 ms", "value": cases["p95_ms"].max()},
-        ]
-    )
-    fig, ax = plt.subplots(figsize=(9, 4.8))
-    colors = ["#276749", "#2c7a7b", "#c05621", "#4c51bf", "#702459"]
-    ax.bar(kpis["metric"], kpis["value"], color=colors)
-    ax.set_yscale("symlog")
-    ax.set_title("Run-Level KPI Scale", loc="left", pad=14)
-    ax.set_ylabel("symlog value")
-    ax.tick_params(axis="x", rotation=15)
-    _save(fig, out_dir / "overview" / "run_kpis.png", index, "overview", "Run KPI scale")
-
 
 def _performance_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> None:
     cases = _actual(data.cases)
@@ -201,6 +173,18 @@ def _performance_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any])
                 index,
                 "performance",
                 f"{example} request latency",
+            )
+            fig = _draw_latency_distribution(
+                frame,
+                title=f"{example}: Request Latency Distribution",
+                x_col="case_axis",
+            )
+            _save(
+                fig,
+                out_dir / "performance" / f"request_latency_range_{_slug(example)}.png",
+                index,
+                "performance",
+                f"{example} request latency range",
             )
 
 
@@ -520,6 +504,13 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
             _outside_legend(ax, "OK")
             entry["plots"].append({"title": "Per-request latency", "path": _save(fig, example_dir / "request_latency.png")})
 
+            fig = _draw_latency_distribution(
+                ex_requests,
+                title=f"{example}: Request Latency Distribution",
+                x_col="case_axis",
+            )
+            entry["plots"].append({"title": "Request latency range", "path": _save(fig, example_dir / "request_latency_range.png")})
+
         ex_components = components[components["example"].astype(str) == example] if not components.empty else pd.DataFrame()
         if not ex_components.empty:
             comp = ex_components.groupby("component", observed=True).agg(duration_ms=("duration_ms", "sum"), total_tokens=("total_tokens", "sum")).reset_index()
@@ -619,6 +610,76 @@ def _draw_longest_waterfall(case: str, spans: pd.DataFrame) -> plt.Figure | None
     return fig
 
 
+def _draw_latency_distribution(frame: pd.DataFrame, title: str, x_col: str) -> plt.Figure:
+    stats: list[dict[str, Any]] = []
+    outlier_rows: list[dict[str, Any]] = []
+    for case_axis, group in frame.groupby(x_col, observed=True, sort=False):
+        latencies = group["latency_ms"].dropna().astype(float)
+        if latencies.empty:
+            continue
+        q1 = float(latencies.quantile(0.25))
+        median = float(latencies.quantile(0.50))
+        q3 = float(latencies.quantile(0.75))
+        iqr = q3 - q1
+        lower_fence = q1 - 1.5 * iqr
+        upper_fence = q3 + 1.5 * iqr
+        inlier = latencies[(latencies >= lower_fence) & (latencies <= upper_fence)]
+        whisker_low = float(inlier.min()) if not inlier.empty else float(latencies.min())
+        whisker_high = float(inlier.max()) if not inlier.empty else float(latencies.max())
+        stats.append(
+            {
+                x_col: str(case_axis),
+                "q1": q1,
+                "median": median,
+                "q3": q3,
+                "whisker_low": whisker_low,
+                "whisker_high": whisker_high,
+            }
+        )
+        for value in latencies[(latencies < whisker_low) | (latencies > whisker_high)]:
+            outlier_rows.append({x_col: str(case_axis), "latency_ms": float(value)})
+
+    fig, ax = plt.subplots(figsize=(14, 6))
+    if not stats:
+        ax.text(0.5, 0.5, "No request latencies found", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return fig
+
+    labels = [row[x_col] for row in stats]
+    x = np.arange(len(labels))
+    width = 0.42
+    for i, row in enumerate(stats):
+        ax.vlines(i, row["whisker_low"], row["whisker_high"], color="#334155", linewidth=1.6)
+        ax.add_patch(
+            plt.Rectangle(
+                (i - width / 2, row["q1"]),
+                width,
+                max(row["q3"] - row["q1"], 0.0001),
+                facecolor="#63b3ed",
+                edgecolor="#1e3a8a",
+                linewidth=1.2,
+                alpha=0.9,
+            )
+        )
+        ax.hlines(row["median"], i - width / 2, i + width / 2, color="#7c2d12", linewidth=2)
+
+    if outlier_rows:
+        outliers = pd.DataFrame(outlier_rows)
+        positions = {label: i for i, label in enumerate(labels)}
+        jitter = np.linspace(-0.14, 0.14, num=len(outliers)) if len(outliers) > 1 else np.array([0.0])
+        xs = [positions[str(row[x_col])] + jitter[idx % len(jitter)] for idx, row in outliers.iterrows()]
+        ax.scatter(xs, outliers["latency_ms"], color="#c53030", s=22, alpha=0.75, label="outlier")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=35, ha="right")
+    ax.set_title(title, loc="left", pad=14)
+    ax.set_xlabel("")
+    ax.set_ylabel("latency (ms)")
+    if outlier_rows:
+        ax.legend(loc="upper right", frameon=False)
+    return fig
+
+
 def _save(
     fig: plt.Figure,
     path: Path,
@@ -689,4 +750,3 @@ def _slug(value: str) -> str:
         else:
             safe.append("-")
     return "".join(safe).strip("-") or "item"
-

@@ -11,7 +11,7 @@ import pandas as pd
 from .topology import build_topology_rows
 
 SPEC_ORDER = ["single", "http", "mcp", "a2a", "memory", "no_memory", "automatic", "agentic"]
-PROFILE_ORDER = ["sequential", "light", "heavy"]
+PROFILE_ORDER = ["sequential", "long-sequential", "light", "heavy"]
 
 
 @dataclass(frozen=True)
@@ -287,12 +287,30 @@ def _order_cases(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return frame
     frame = frame.copy()
-    if "spec" in frame:
-        frame["spec"] = pd.Categorical(frame["spec"], SPEC_ORDER, ordered=True)
-    if "profile" in frame:
-        frame["profile"] = pd.Categorical(frame["profile"], PROFILE_ORDER, ordered=True)
     sort_cols = [col for col in ["example", "spec", "profile", "case_name"] if col in frame.columns]
-    return frame.sort_values(sort_cols).reset_index(drop=True)
+    if not sort_cols:
+        return frame.reset_index(drop=True)
+
+    sort_frame = frame.copy()
+    if "spec" in sort_frame:
+        sort_frame["_spec_order"] = _ordered_sort_key(sort_frame["spec"], SPEC_ORDER)
+    if "profile" in sort_frame:
+        sort_frame["_profile_order"] = _ordered_sort_key(sort_frame["profile"], PROFILE_ORDER)
+
+    by: list[str] = []
+    for col in sort_cols:
+        if col == "spec" and "_spec_order" in sort_frame:
+            by.append("_spec_order")
+        elif col == "profile" and "_profile_order" in sort_frame:
+            by.append("_profile_order")
+        by.append(col)
+    return sort_frame.sort_values(by).drop(columns=["_spec_order", "_profile_order"], errors="ignore").reset_index(drop=True)
+
+
+def _ordered_sort_key(values: pd.Series, ordered_values: list[str]) -> pd.Series:
+    order = {value: index for index, value in enumerate(ordered_values)}
+    fallback = len(order)
+    return values.astype(str).map(lambda value: order.get(value, fallback))
 
 
 def _expected_cases(run_info: dict[str, Any], cases: pd.DataFrame) -> pd.DataFrame:
@@ -328,7 +346,8 @@ def _expected_cases(run_info: dict[str, Any], cases: pd.DataFrame) -> pd.DataFra
                         "expected": True,
                         "configured": True,
                         "present": case_name in present,
-                        "configured_requests": profile.get("requests", 0) if isinstance(profile, dict) else 0,
+                        "configured_mode": profile.get("mode", "") if isinstance(profile, dict) else "",
+                        "configured_value": profile.get("value", 0) if isinstance(profile, dict) else 0,
                         "configured_concurrency": profile.get("concurrency", 0) if isinstance(profile, dict) else 0,
                         "timeout_seconds": profile.get("timeout_seconds", 0) if isinstance(profile, dict) else 0,
                     }
@@ -340,7 +359,9 @@ def _expected_cases(run_info: dict[str, Any], cases: pd.DataFrame) -> pd.DataFra
     profile_names.update(str(p) for p in selected_profiles)
     if not profile_names and not cases.empty:
         profile_names.update(cases["profile"].astype(str))
-    comparison_profiles = [profile for profile in PROFILE_ORDER if profile in profile_names]
+    ordered_profile_names = [profile for profile in PROFILE_ORDER if profile in profile_names]
+    ordered_profile_names.extend(sorted(profile_names - set(ordered_profile_names)))
+    comparison_profiles = ordered_profile_names
     for example in comparison_examples:
         for spec in comparison_specs:
             for profile_name in comparison_profiles:
@@ -356,7 +377,8 @@ def _expected_cases(run_info: dict[str, Any], cases: pd.DataFrame) -> pd.DataFra
                         "expected": False,
                         "configured": False,
                         "present": case_name in present,
-                        "configured_requests": 0,
+                        "configured_mode": "",
+                        "configured_value": 0,
                         "configured_concurrency": 0,
                         "timeout_seconds": 0,
                     }

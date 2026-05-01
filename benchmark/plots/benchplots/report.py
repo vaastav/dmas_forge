@@ -7,7 +7,7 @@ import os
 import pandas as pd
 from jinja2 import Environment, select_autoescape
 
-from .data import BenchmarkRun
+from .data import BenchmarkRun, SPEC_ORDER
 
 
 def write_report(data: BenchmarkRun, plot_index: dict[str, Any], out_dir: Path) -> None:
@@ -26,24 +26,25 @@ def _render(data: BenchmarkRun, plot_index: dict[str, Any]) -> str:
     template = _template(REPORT_TEMPLATE)
     cases = data.cases.copy()
     expected = data.expected_cases.copy()
-    missing = expected[~expected["present"]] if not expected.empty and "present" in expected else pd.DataFrame()
     partial = cases[cases["errors"] > 0] if not cases.empty else pd.DataFrame()
     failed = cases[(cases["requests"] > 0) & (cases["successes"] == 0)] if not cases.empty else pd.DataFrame()
     top_latency = cases.sort_values("p95_ms", ascending=False).head(10) if not cases.empty else pd.DataFrame()
     top_tokens = cases.sort_values("total_tokens", ascending=False).head(10) if not cases.empty else pd.DataFrame()
     return template.render(
         run_id=data.run_id,
+        model_name=_model_name(data.run_info),
         run_info=data.run_info,
         plots=plot_index.get("sections", {}),
         case_plots=plot_index.get("cases", []),
         kpis=_run_kpis(cases, expected),
-        missing=_records(missing),
         partial=_sorted_records(partial, ["example", "spec", "profile"]),
         failed=_sorted_records(failed, ["example", "spec", "profile"]),
         top_latency=_records(top_latency),
         top_tokens=_records(top_tokens),
         errors=_error_rows(data.errors),
-        profiles=_profile_table(data.run_info),
+        profiles=_profile_table(data.run_info, cases),
+        intra_spec_comparisons=_records(_spec_comparisons(cases)),
+        inter_example_comparisons=_records(_example_spec_comparisons(cases)),
         examples=plot_index.get("examples", []),
         generated_note="Generated from saved benchmark artifacts; benchmark/results was read-only.",
     )
@@ -60,7 +61,6 @@ def _render_example(
     example = example_entry["example"]
     cases = data.cases[data.cases["example"].astype(str) == example].copy() if not data.cases.empty else pd.DataFrame()
     expected = data.expected_cases[data.expected_cases["example"].astype(str) == example].copy() if not data.expected_cases.empty else pd.DataFrame()
-    missing = expected[~expected["present"]] if not expected.empty and "present" in expected else pd.DataFrame()
     partial = cases[cases["errors"] > 0] if not cases.empty else pd.DataFrame()
     errors = data.errors[data.errors["example"].astype(str) == example] if not data.errors.empty else pd.DataFrame()
 
@@ -85,6 +85,7 @@ def _render_example(
     ]
     return template.render(
         run_id=data.run_id,
+        model_name=_model_name(data.run_info),
         example=example,
         root_index=_rel(out_dir / "index.html", page_dir),
         css=_rel(out_dir / "assets" / "report.css", page_dir),
@@ -93,7 +94,7 @@ def _render_example(
         topology=topology,
         case_plots=case_plots,
         cases=_sorted_records(cases, ["spec", "profile"]),
-        missing=_sorted_records(missing, ["spec", "profile"]),
+        spec_comparisons=_records(_spec_comparisons(cases)),
         partial=_sorted_records(partial, ["spec", "profile"]),
         errors=_error_rows(errors),
     )
@@ -162,19 +163,173 @@ def _rel(target: Path, start: Path) -> str:
     return os.path.relpath(target, start).replace(os.sep, "/")
 
 
-def _profile_table(run_info: dict[str, Any]) -> list[dict[str, Any]]:
+def _profile_table(run_info: dict[str, Any], cases: pd.DataFrame) -> list[dict[str, Any]]:
     cfg = run_info.get("config", {}) if isinstance(run_info.get("config"), dict) else {}
-    rows: list[dict[str, Any]] = []
-    for profile in cfg.get("profiles", []) if isinstance(cfg.get("profiles"), list) else []:
-        if isinstance(profile, dict):
-            rows.append({"scope": "default", **profile})
+    used = set()
+    if not cases.empty:
+        used = {(str(row.example), str(row.profile)) for row in cases[["example", "profile"]].drop_duplicates().itertuples(index=False)}
+    if not used:
+        return []
+
+    global_profiles = {
+        str(profile.get("name", "")): profile
+        for profile in cfg.get("profiles", [])
+        if isinstance(profile, dict)
+    }
+    rows_by_key: dict[tuple[Any, ...], dict[str, Any]] = {}
+    known_examples: set[str] = set()
     for ex in cfg.get("examples", []) if isinstance(cfg.get("examples"), list) else []:
-        if not isinstance(ex, dict) or not ex.get("profiles"):
+        if not isinstance(ex, dict):
             continue
-        for profile in ex["profiles"]:
-            if isinstance(profile, dict):
-                rows.append({"scope": ex.get("name", "example"), **profile})
-    return rows
+        example = str(ex.get("name", ""))
+        known_examples.add(example)
+        raw_example_profiles = ex.get("profiles") if isinstance(ex.get("profiles"), list) else []
+        example_profiles = {
+            str(profile.get("name", "")): profile
+            for profile in raw_example_profiles
+            if isinstance(profile, dict)
+        }
+        for used_example, profile_name in sorted(used):
+            if used_example != example:
+                continue
+            profile = example_profiles.get(profile_name) or global_profiles.get(profile_name) or {"name": profile_name}
+            mode = str(profile.get("mode", ""))
+            value = profile.get("value", 0)
+            scope = example if profile_name in example_profiles else "default"
+            _add_profile_row(rows_by_key, cases, example, profile_name, scope, mode, value, profile)
+    for example, profile_name in sorted((example, profile) for example, profile in used if example not in known_examples):
+        profile = global_profiles.get(profile_name) or {"name": profile_name}
+        mode = str(profile.get("mode", ""))
+        value = profile.get("value", 0)
+        scope = "default" if profile_name in global_profiles else example
+        _add_profile_row(rows_by_key, cases, example, profile_name, scope, mode, value, profile)
+    return list(rows_by_key.values())
+
+
+def _add_profile_row(
+    rows_by_key: dict[tuple[Any, ...], dict[str, Any]],
+    cases: pd.DataFrame,
+    example: str,
+    profile_name: str,
+    scope: str,
+    mode: str,
+    value: Any,
+    profile: dict[str, Any],
+) -> None:
+    key = (
+        scope,
+        profile_name,
+        mode,
+        str(value),
+        str(profile.get("concurrency", "")),
+        str(profile.get("timeout_seconds", "")),
+    )
+    row = rows_by_key.setdefault(
+        key,
+        {
+            "scope": scope,
+            "name": profile_name,
+            "load_type": _load_type(mode),
+            "target": _load_target(mode, value),
+            "concurrency": profile.get("concurrency", ""),
+            "timeout_seconds": profile.get("timeout_seconds", ""),
+            "cases": 0,
+        },
+    )
+    row["cases"] += int(
+        (
+            (cases["example"].astype(str) == example)
+            & (cases["profile"].astype(str) == profile_name)
+        ).sum()
+    )
+
+
+def _load_type(mode: str) -> str:
+    if mode == "timed":
+        return "timed duration"
+    if mode == "requests":
+        return "fixed request count"
+    return mode or "unknown"
+
+
+def _load_target(mode: str, value: Any) -> str:
+    if mode == "timed":
+        return f"{format_cell(value)} seconds"
+    if mode == "requests":
+        return f"{format_cell(value)} requests"
+    return format_cell(value)
+
+
+def _spec_comparisons(cases: pd.DataFrame) -> pd.DataFrame:
+    if cases.empty:
+        return pd.DataFrame()
+    rows: list[dict[str, Any]] = []
+    for (example, profile), group in cases.groupby(["example", "profile"], observed=True, sort=True):
+        if group["spec"].nunique() < 2:
+            continue
+        fastest_p95 = float(group["p95_ms"].min())
+        best_throughput = float(group["throughput_rps"].max())
+        for row in _sort_by_spec(group).itertuples(index=False):
+            p95 = float(row.p95_ms)
+            throughput = float(row.throughput_rps)
+            rows.append(
+                {
+                    "example": str(example),
+                    "profile": str(profile),
+                    "spec": str(row.spec),
+                    "requests": int(row.requests),
+                    "success_rate": float(row.success_rate),
+                    "p95_ms": p95,
+                    "p95_vs_fastest_ms": p95 - fastest_p95,
+                    "throughput_rps": throughput,
+                    "throughput_vs_best_pct": ((throughput / best_throughput) - 1.0) * 100 if best_throughput else 0.0,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def _example_spec_comparisons(cases: pd.DataFrame) -> pd.DataFrame:
+    if cases.empty:
+        return pd.DataFrame()
+    rows: list[dict[str, Any]] = []
+    for (spec, profile), group in cases.groupby(["spec", "profile"], observed=True, sort=True):
+        if group["example"].nunique() < 2:
+            continue
+        fastest_p95 = float(group["p95_ms"].min())
+        for row in group.sort_values(["example"]).itertuples(index=False):
+            rows.append(
+                {
+                    "spec": str(spec),
+                    "profile": str(profile),
+                    "example": str(row.example),
+                    "requests": int(row.requests),
+                    "success_rate": float(row.success_rate),
+                    "p95_ms": float(row.p95_ms),
+                    "p95_vs_fastest_ms": float(row.p95_ms) - fastest_p95,
+                    "throughput_rps": float(row.throughput_rps),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def _sort_by_spec(frame: pd.DataFrame) -> pd.DataFrame:
+    order = {spec: index for index, spec in enumerate(SPEC_ORDER)}
+    return (
+        frame.assign(_spec_order=frame["spec"].astype(str).map(lambda value: order.get(value, len(order))))
+        .sort_values(["_spec_order", "spec"])
+        .drop(columns=["_spec_order"])
+    )
+
+
+def _model_name(run_info: dict[str, Any]) -> str:
+    model = run_info.get("model")
+    if isinstance(model, dict):
+        name = model.get("name")
+        if name:
+            return str(name)
+    if isinstance(model, str) and model:
+        return model
+    return "unknown"
 
 
 REPORT_TEMPLATE = """{% macro gallery(items) -%}
@@ -225,12 +380,14 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
     <div>
       <p class="eyebrow">DMAS Forge Benchmark Report</p>
       <h1>Run {{ run_id }}</h1>
+      <p class="model-line">Model: {{ model_name }}</p>
       <p class="subtitle">{{ generated_note }}</p>
     </div>
     <nav>
       <a href="#overview">Overview</a>
       <a href="#topology">Topology</a>
       <a href="#performance">Performance</a>
+      <a href="#spec-comparisons">Spec Comparisons</a>
       <a href="#reliability">Reliability</a>
       <a href="#tokens">Tokens</a>
       <a href="#resources">Resources</a>
@@ -257,18 +414,14 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
       <div class="table-pair">
         <div>
           <h3>Profiles</h3>
-          {{ table(profiles, ["scope", "name", "requests", "concurrency", "timeout_seconds"]) }}
+          <p class="muted">Fixed request count profiles stop after the target request count; timed duration profiles keep issuing requests until the target duration elapses.</p>
+          {{ table(profiles, ["scope", "name", "load_type", "target", "concurrency", "timeout_seconds", "cases"]) }}
         </div>
         <div>
           <h3>Error Categories</h3>
           {{ table(errors, ["category", "count"]) }}
         </div>
       </div>
-
-      {% if missing %}
-      <h3>Absent Comparison Cells</h3>
-      {{ table(missing, ["case_name", "example", "spec", "profile", "configured", "configured_requests", "configured_concurrency"]) }}
-      {% endif %}
 
       <h3>Example Views</h3>
       <div class="example-links">
@@ -288,6 +441,15 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
       {{ gallery(plots.get("performance", [])) }}
       <h3>Highest p95 Latency</h3>
       {{ table(top_latency, ["case_name", "successes", "errors", "throughput_rps", "p50_ms", "p95_ms", "p99_ms"]) }}
+    </section>
+
+    <section id="spec-comparisons" class="section">
+      <h2>Spec Comparisons</h2>
+      <p class="subtitle">Intra-example rows compare specs within the same example and profile. Inter-example rows compare examples under the same spec and profile.</p>
+      <h3>Intra-Example</h3>
+      {{ table(intra_spec_comparisons, ["example", "profile", "spec", "requests", "success_rate", "p95_ms", "p95_vs_fastest_ms", "throughput_rps", "throughput_vs_best_pct"]) }}
+      <h3>Inter-Example</h3>
+      {{ table(inter_example_comparisons, ["spec", "profile", "example", "requests", "success_rate", "p95_ms", "p95_vs_fastest_ms", "throughput_rps"]) }}
     </section>
 
     <section id="reliability" class="section">
@@ -392,6 +554,7 @@ EXAMPLE_TEMPLATE = """{% macro gallery(items) -%}
     <div>
       <p class="eyebrow">Example View</p>
       <h1>{{ example }}</h1>
+      <p class="model-line">Model: {{ model_name }}</p>
       <p class="subtitle">Run {{ run_id }}</p>
     </div>
     <nav><a href="{{ root_index }}">Full report</a></nav>
@@ -409,16 +572,8 @@ EXAMPLE_TEMPLATE = """{% macro gallery(items) -%}
         <div><span>{{ "{:,}".format(kpis.tokens) }}</span><label>tokens</label></div>
       </div>
       {{ gallery(plots) }}
-      <div class="table-pair">
-        <div>
-          <h3>Error Categories</h3>
-          {{ table(errors, ["category", "count"]) }}
-        </div>
-        <div>
-          <h3>Absent Cells</h3>
-          {{ table(missing, ["case_name", "spec", "profile", "configured"]) }}
-        </div>
-      </div>
+      <h3>Error Categories</h3>
+      {{ table(errors, ["category", "count"]) }}
     </section>
     <section class="section">
       <h2>Topology</h2>
@@ -426,6 +581,8 @@ EXAMPLE_TEMPLATE = """{% macro gallery(items) -%}
     </section>
     <section class="section">
       <h2>Cases</h2>
+      <h3>Spec Comparison</h3>
+      {{ table(spec_comparisons, ["profile", "spec", "requests", "success_rate", "p95_ms", "p95_vs_fastest_ms", "throughput_rps", "throughput_vs_best_pct"]) }}
       {{ table(cases, ["case_name", "requests", "successes", "errors", "throughput_rps", "p50_ms", "p95_ms", "p99_ms", "total_tokens"]) }}
       <h3>Partial or Failed Cases</h3>
       {{ table(partial, ["case_name", "requests", "successes", "errors", "p95_ms"]) }}
@@ -503,6 +660,11 @@ body {
 }
 .subtitle { color: var(--muted); margin-top: 4px; }
 .page-header .subtitle { color: #cbd5e1; }
+.model-line {
+  margin: 0 0 6px;
+  color: #e2e8f0;
+  font-weight: 700;
+}
 nav {
   display: flex;
   flex-wrap: wrap;
