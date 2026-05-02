@@ -25,7 +25,7 @@ func GenerateClient(builder golang.ModuleBuilder, service *gocode.ServiceInterfa
 		Imports: gogen.NewImports(pkg.Name),
 	}
 
-	client.Imports.AddPackages("context", "encoding/json", "errors", "github.com/modelcontextprotocol/go-sdk/mcp")
+	client.Imports.AddPackages("context", "encoding/json", "errors", "sync", "github.com/modelcontextprotocol/go-sdk/mcp")
 	slog.Info(fmt.Sprintf("Generating %v/%v.go", client.Package.PackageName, client.Name))
 	outputFile := filepath.Join(client.Package.Path, client.Name+".go")
 	return gogen.ExecuteTemplateToFile("MCPClient", clientTemplate, client, outputFile)
@@ -44,26 +44,77 @@ package {{.Package.ShortName}}
 {{.Imports}}
 
 type {{.Name}} struct {
+	MCPClient *mcp.Client
 	Client *mcp.ClientSession
+	mu sync.RWMutex
 	ServerAddress string
 }
 
 func New_{{.Name}}(ctx context.Context, serverAddress string) (*{{.Name}}, error) {
-	// Create an MCP client.
-	client := mcp.NewClient(&mcp.Implementation{
+	c := &{{.Name}}{}
+	c.MCPClient = mcp.NewClient(&mcp.Implementation{
 		Name:    "{{.Name}}",
 		Version: "1.0.0",
 	}, nil)
+	c.ServerAddress = serverAddress
 
-	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: "http://" + serverAddress}, nil)
+	session, err := c.connect(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	c := &{{.Name}}{}
 	c.Client = session
-	c.ServerAddress = serverAddress
 	return c, nil
+}
+
+func (mcpclient *{{.Name}}) connect(ctx context.Context) (*mcp.ClientSession, error) {
+	return mcpclient.MCPClient.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: "http://" + mcpclient.ServerAddress}, nil)
+}
+
+func (mcpclient *{{.Name}}) currentSession() *mcp.ClientSession {
+	mcpclient.mu.RLock()
+	defer mcpclient.mu.RUnlock()
+	return mcpclient.Client
+}
+
+func (mcpclient *{{.Name}}) replaceSession(ctx context.Context, stale *mcp.ClientSession) (*mcp.ClientSession, error) {
+	mcpclient.mu.Lock()
+	defer mcpclient.mu.Unlock()
+	if mcpclient.Client != stale {
+		return mcpclient.Client, nil
+	}
+	session, err := mcpclient.connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	mcpclient.Client = session
+	if session == nil {
+		return nil, errors.New("mcp reconnect returned nil session")
+	}
+	if stale != nil {
+		_ = stale.Close()
+	}
+	return session, nil
+}
+
+func (mcpclient *{{.Name}}) callTool(ctx context.Context, params *mcp.CallToolParams) (*mcp.CallToolResult, error) {
+	session := mcpclient.currentSession()
+	if session == nil {
+		var err error
+		session, err = mcpclient.replaceSession(ctx, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+	result, err := session.CallTool(ctx, params)
+	if err == nil {
+		return result, nil
+	}
+
+	session, err = mcpclient.replaceSession(ctx, session)
+	if err != nil {
+		return nil, err
+	}
+	return session.CallTool(ctx, params)
 }
 
 {{$service := .Service.Name -}}
@@ -75,7 +126,7 @@ func (mcpclient *{{$receiver}}) {{SignatureWithRetVars $f}} {
 	args["{{Title $arg.Name}}"] = {{$arg.Name}}
 	{{end}}
 
-	result, err := mcpclient.Client.CallTool(ctx, &mcp.CallToolParams{
+	result, err := mcpclient.callTool(ctx, &mcp.CallToolParams{
 		Name: "{{$f.Name}}",
 		Arguments: args,
 	})
