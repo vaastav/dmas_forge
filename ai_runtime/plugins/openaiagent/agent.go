@@ -2,6 +2,7 @@ package openaiagent
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	openai "github.com/openai/openai-go"
@@ -82,7 +83,12 @@ func (c *OpenAILLMClient) LLMCall(ctx context.Context, query string) (string, er
 		return "", err
 	}
 	setTokenAttributes(span, completion.Usage)
-	return completion.Choices[0].Message.Content, nil
+	choice, err := firstChoice(completion)
+	if err != nil {
+		recordSpanError(span, err)
+		return "", err
+	}
+	return choice.Message.Content, nil
 }
 
 // defaultMaxToolRounds is the default maximum number of tool-call round-trips
@@ -133,15 +139,21 @@ func (c *OpenAILLMClient) LLMCallWithTools(ctx context.Context, query string) (s
 			totalTokens += completion.Usage.TotalTokens
 		}
 
-		toolCalls := completion.Choices[0].Message.ToolCalls
+		choice, err := firstChoice(completion)
+		if err != nil {
+			recordSpanError(span, err)
+			return "", err
+		}
+
+		toolCalls := choice.Message.ToolCalls
 		if len(toolCalls) == 0 {
 			setAggregatedTokenAttributes(span, tokenUsageAvailable, inputTokens, outputTokens, totalTokens)
 			span.SetAttributes(attribute.Int("llm.tool_call_count", toolCallCount))
-			return completion.Choices[0].Message.Content, nil
+			return choice.Message.Content, nil
 		}
 
 		// Handle tool calls and continue the conversation
-		params.Messages = append(params.Messages, completion.Choices[0].Message.ToParam())
+		params.Messages = append(params.Messages, choice.Message.ToParam())
 		for _, toolCall := range toolCalls {
 			toolCallCount++
 			toolCtx, toolSpan := tracer.Start(ctx, "llm.tool_call",
@@ -179,12 +191,24 @@ func (c *OpenAILLMClient) LLMCallWithTools(ctx context.Context, query string) (s
 		outputTokens += completion.Usage.CompletionTokens
 		totalTokens += completion.Usage.TotalTokens
 	}
+	choice, err := firstChoice(completion)
+	if err != nil {
+		recordSpanError(span, err)
+		return "", err
+	}
 	setAggregatedTokenAttributes(span, tokenUsageAvailable, inputTokens, outputTokens, totalTokens)
 	span.SetAttributes(
 		attribute.Int("llm.tool_call_count", toolCallCount),
 		attribute.Bool("llm.max_tool_rounds_exhausted", true),
 	)
-	return completion.Choices[0].Message.Content, nil
+	return choice.Message.Content, nil
+}
+
+func firstChoice(completion *openai.ChatCompletion) (openai.ChatCompletionChoice, error) {
+	if completion == nil || len(completion.Choices) == 0 {
+		return openai.ChatCompletionChoice{}, fmt.Errorf("openai completion returned zero choices")
+	}
+	return completion.Choices[0], nil
 }
 
 func mapsToValues(tooldefs map[string]openai.ChatCompletionToolParam) []openai.ChatCompletionToolParam {
