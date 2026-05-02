@@ -3,10 +3,12 @@ package workflow
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	openai "github.com/openai/openai-go"
@@ -19,10 +21,17 @@ import (
 const mcpBridgeTracerName = "github.com/vaastav/agentic_blueprint/examples/financial-analyzer/workflow/mcp_bridge"
 
 type MCPToolBridge struct {
-	sessions  []*mcp.ClientSession
+	servers   []*mcpBridgeServer
 	toolToIdx map[string]int
 	tools     map[string]openai.ChatCompletionToolParam
 	mock      bool
+}
+
+type mcpBridgeServer struct {
+	url     string
+	client  *mcp.Client
+	session *mcp.ClientSession
+	mu      sync.RWMutex
 }
 
 func NewMCPToolBridge(ctx context.Context, serverURLs []string) (*MCPToolBridge, error) {
@@ -31,6 +40,7 @@ func NewMCPToolBridge(ctx context.Context, serverURLs []string) (*MCPToolBridge,
 	}
 
 	b := &MCPToolBridge{
+		servers:   make([]*mcpBridgeServer, 0, len(serverURLs)),
 		toolToIdx: make(map[string]int),
 		tools:     make(map[string]openai.ChatCompletionToolParam),
 	}
@@ -57,9 +67,8 @@ func NewMCPToolBridge(ctx context.Context, serverURLs []string) (*MCPToolBridge,
 			Version: "1.0.0",
 		}, nil)
 
-		session, err := client.Connect(serverCtx, &mcp.StreamableClientTransport{
-			Endpoint: url,
-		}, nil)
+		server := &mcpBridgeServer{url: url, client: client}
+		session, err := server.connect(serverCtx)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
@@ -81,8 +90,9 @@ func NewMCPToolBridge(ctx context.Context, serverURLs []string) (*MCPToolBridge,
 		span.SetStatus(codes.Ok, "")
 		span.End()
 
-		idx := len(b.sessions)
-		b.sessions = append(b.sessions, session)
+		idx := len(b.servers)
+		server.session = session
+		b.servers = append(b.servers, server)
 
 		for _, tool := range result.Tools {
 			if _, exists := b.toolToIdx[tool.Name]; exists {
@@ -99,13 +109,15 @@ func NewMCPToolBridge(ctx context.Context, serverURLs []string) (*MCPToolBridge,
 	}
 
 	if len(b.tools) == 0 {
-		for _, session := range b.sessions {
-			_ = session.Close()
+		for _, server := range b.servers {
+			if session := server.currentSession(); session != nil {
+				_ = session.Close()
+			}
 		}
 		return nil, fmt.Errorf("no tools discovered from any MCP server")
 	}
 
-	log.Printf("MCP bridge: connected to %d server(s), discovered %d tool(s)", len(b.sessions), len(b.tools))
+	log.Printf("MCP bridge: connected to %d server(s), discovered %d tool(s)", len(b.servers), len(b.tools))
 	return b, nil
 }
 
@@ -153,7 +165,7 @@ func (b *MCPToolBridge) HandleToolCall(ctx context.Context, tc openai.ChatComple
 		args = make(map[string]any)
 	}
 
-	result, err := b.sessions[idx].CallTool(ctx, &mcp.CallToolParams{
+	result, err := b.callTool(ctx, idx, &mcp.CallToolParams{
 		Name:      tc.Function.Name,
 		Arguments: args,
 	})
@@ -185,12 +197,67 @@ func (b *MCPToolBridge) HandleToolCall(ctx context.Context, tc openai.ChatComple
 
 func (b *MCPToolBridge) Close() error {
 	var firstErr error
-	for _, session := range b.sessions {
-		if err := session.Close(); err != nil && firstErr == nil {
-			firstErr = err
+	for _, server := range b.servers {
+		session := server.currentSession()
+		if session != nil {
+			if err := session.Close(); err != nil && firstErr == nil {
+				firstErr = err
+			}
 		}
 	}
 	return firstErr
+}
+
+func (s *mcpBridgeServer) connect(ctx context.Context) (*mcp.ClientSession, error) {
+	return s.client.Connect(ctx, &mcp.StreamableClientTransport{Endpoint: s.url}, nil)
+}
+
+func (s *mcpBridgeServer) currentSession() *mcp.ClientSession {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.session
+}
+
+func (s *mcpBridgeServer) replaceSession(ctx context.Context, stale *mcp.ClientSession) (*mcp.ClientSession, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.session != stale {
+		return s.session, nil
+	}
+	session, err := s.connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	s.session = session
+	if session == nil {
+		return nil, errors.New("mcp reconnect returned nil session")
+	}
+	if stale != nil {
+		_ = stale.Close()
+	}
+	return session, nil
+}
+
+func (b *MCPToolBridge) callTool(ctx context.Context, idx int, params *mcp.CallToolParams) (*mcp.CallToolResult, error) {
+	server := b.servers[idx]
+	session := server.currentSession()
+	if session == nil {
+		var err error
+		session, err = server.replaceSession(ctx, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+	result, err := session.CallTool(ctx, params)
+	if err == nil {
+		return result, nil
+	}
+
+	session, err = server.replaceSession(ctx, session)
+	if err != nil {
+		return nil, err
+	}
+	return session.CallTool(ctx, params)
 }
 
 func (b *MCPToolBridge) providerMode() string {
