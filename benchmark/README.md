@@ -61,6 +61,9 @@ go run main.go list
 # Generate deployments only.
 go run main.go build -examples weather,chat -specs single,memory
 
+# Patch OTel deps in a deployment generated outside the benchmark runner.
+bash patch-generated-otel-deps.sh ../examples/marketing-agency/wiring/build
+
 # Run one request per selected case.
 go run main.go smoke -examples weather -specs single,http
 

@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 type BuildOptions struct {
@@ -50,52 +49,6 @@ func generateDeployment(repoRoot, modelFile string, ex ExampleConfig, spec strin
 	if err := runCommand(append([]string{"go"}, args...), wiringDir, logWriter); err != nil {
 		return err
 	}
-	return pinGeneratedOTelDeps(outDir, logWriter)
-}
-
-func pinGeneratedOTelDeps(outDir string, logWriter io.Writer) error {
-	var modFiles []string
-	err := filepath.WalkDir(filepath.Join(outDir, "docker"), func(path string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		if entry.Name() != "go.mod" {
-			return nil
-		}
-		b, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		if strings.HasPrefix(string(b), "module blueprint/goproc/") {
-			modFiles = append(modFiles, path)
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	for _, modFile := range modFiles {
-		modDir := filepath.Dir(modFile)
-		fmt.Fprintf(logWriter, "pinning otel dependencies in %s\n", modFile)
-		if err := runCommand([]string{
-			"go", "mod", "edit",
-			"-require=go.opentelemetry.io/otel@v1.26.0",
-			"-require=go.opentelemetry.io/otel/metric@v1.26.0",
-			"-require=go.opentelemetry.io/otel/trace@v1.26.0",
-			"-require=go.opentelemetry.io/otel/sdk@v1.26.0",
-			"-require=go.opentelemetry.io/otel/sdk/metric@v1.26.0",
-			"-require=go.opentelemetry.io/otel/exporters/stdout/stdoutmetric@v1.26.0",
-			"-require=go.opentelemetry.io/otel/exporters/stdout/stdouttrace@v1.26.0",
-		}, modDir, logWriter); err != nil {
-			return err
-		}
-		if err := runCommand([]string{"go", "mod", "tidy"}, modDir, logWriter); err != nil {
-			return err
-		}
-	}
-	return nil
+	patchScript := filepath.Join(repoRoot, "benchmark", "patch-generated-otel-deps.sh")
+	return runCommand([]string{"bash", patchScript, outDir}, repoRoot, logWriter)
 }
