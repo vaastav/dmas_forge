@@ -6,7 +6,7 @@ It is based on the `marketing-agency` example from Google's adk repo, but reimpl
 
 The coordinator orchestrates four specialized agents:
 
-- `DomainAgent`: suggests candidate domains using DuckDuckGo search.
+- `DomainAgent`: suggests candidate domains using simple TCP domain checks.
 - `WebsiteAgent`: asks the LLM for a compact file plan, then generates each planned file sequentially.
 - `MarketingAgent`: generates a full marketing strategy document.
 - `LogoAgent`: generates a logo image via OpenAI images API, saves it locally, and returns file metadata.

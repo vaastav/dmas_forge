@@ -14,8 +14,8 @@ const domainAgentPrompt = `You are a domain naming specialist.
 
 Task:
 - Generate many domain ideas from brand keywords.
-- Use duckduckgo_search to look for evidence the domain may already be active.
-- Return exactly 10 candidate domains that appear available.
+- Use check_domain on candidate domains.
+- Return exactly 10 candidate domains with available=true.
 
 Output format:
 Return valid JSON only:
@@ -34,12 +34,12 @@ func NewDomainAgentImpl(ctx context.Context, agent core.Agent) (DomainAgent, err
 	}
 
 	if err := a.agent.AddTools(ctx, map[string]openai.ChatCompletionToolParam{
-		"duckduckgo_search": tools.DuckDuckGoSearchTool(),
+		"check_domain": tools.DomainCheckTool(),
 	}); err != nil {
 		return nil, err
 	}
 
-	if err := a.agent.RegisterToolCallHandler(ctx, tools.DuckDuckGoSearchHandler()); err != nil {
+	if err := a.agent.RegisterToolCallHandler(ctx, tools.DomainCheckHandler()); err != nil {
 		return nil, err
 	}
 

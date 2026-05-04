@@ -134,7 +134,7 @@ Set `"mock": true` in `config.json` to inject `DMAS_BENCH_MOCK=1` into benchmark
 
 That currently mocks:
 
-- `marketing-agency` DuckDuckGo search: returns fixed search-result JSON
+- `marketing-agency` domain checks: returns deterministic `available=true` results without network calls
 - `marketing-agency` image generation: writes a deterministic local JPEG instead of calling DALL-E
 - `financial-analyzer` MCP tools: replaces external MCP servers with local `search_web` and `fetch_url` tools backed by fixed finance fixtures
 
