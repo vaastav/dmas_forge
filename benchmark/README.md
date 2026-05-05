@@ -133,6 +133,26 @@ The run folder also includes `run.json`, which records the config and model name
 - `model.json`: model name, URL, key, and embedding model
 - `queries/*.csv`: request inputs for each example
 
+### Config Reference
+
+`profiles` define the type and scope of workload the runner generates. Each selected example/spec pair runs with each selected profile.
+
+`examples` define the target examples that receive those workloads. Add or remove examples by editing the `examples` list and keeping the referenced query CSV in `benchmark/queries/`.
+
+- `mock`: enables deterministic local mocks for examples that support mock behavior.
+- `profile.name`: CLI/profile label used by `-profiles`.
+- `profile.mode`: `requests` runs exactly `value` requests; `timed` runs for `value` seconds.
+- `profile.value`: request count for `requests`; duration in seconds for `timed`.
+- `profile.concurrency`: number of parallel request workers; use `1` for sequential runs.
+- `profile.timeout_seconds`: per-request HTTP timeout.
+- `example.name`: example folder/name used by `-examples`.
+- `example.specs`: wiring specs to compare, such as `single`, `http`, `mcp`, `a2a`, `memory`, `no_memory`, `automatic`, or `agentic`.
+- `example.route`: HTTP path to call on the selected service, for example `/Query` or `/Chat`.
+- `example.request`: `params` sends CSV columns as query string values; `body` sends each CSV row as JSON in the `req` query param.
+- `example.query_file`: CSV file under `benchmark/` containing request rows.
+- `example.entrypoint_env`: env var from the generated deployment that exposes the service HTTP bind address.
+- `example.params`: CSV columns to send for `params` requests; omit for `body` requests.
+
 Set `"mock": true` in `config.json` to inject `DMAS_BENCH_MOCK=1` into benchmark containers.
 
 That currently mocks:
