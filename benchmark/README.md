@@ -34,6 +34,7 @@ Each example has one or more specs, such as `single`, `http`, `mcp`, `a2a`, `mem
 
 Profiles control load:
 
+- `smoke`: one request, for checking that a case starts and responds
 - `sequential`: low load, one request at a time
 - `light`: small concurrent run
 - `heavy`: larger concurrent run
@@ -47,7 +48,7 @@ Each profile uses `mode` and `value`:
 
 ```bash
 go run main.go list
-go run main.go smoke -examples weather -specs single -profiles sequential
+go run main.go run -examples weather -specs single -profiles smoke
 go run main.go run -examples weather -specs single -profiles sequential
 go run main.go summary
 ```
@@ -65,7 +66,7 @@ go run main.go build -examples weather,chat -specs single,memory
 bash patch-generated-otel-deps.sh ../examples/marketing-agency/wiring/build
 
 # Run one request per selected case.
-go run main.go smoke -examples weather -specs single,http
+go run main.go run -examples weather -specs single,http -profiles smoke
 
 # Run the selected benchmark cases.
 go run main.go run -examples weather -specs single -profiles sequential

@@ -18,9 +18,7 @@ func Run(args []string) error {
 	case "build":
 		return commandBuild(args[2:])
 	case "run":
-		return commandRun(args[2:], false)
-	case "smoke":
-		return commandRun(args[2:], true)
+		return commandRun(args[2:])
 	case "summary":
 		return commandSummary(args[2:])
 	case "jaeger":
@@ -38,8 +36,7 @@ Example Usage:
   go run main.go -h
   go run main.go list
   go run main.go build -examples weather,chat -specs single,memory
-  go run main.go run -examples weather -specs single,http
-  go run main.go smoke -examples weather -specs single,http
+  go run main.go run -examples weather -specs single,http -profiles smoke
   go run main.go summary -run 20260429-120000
   go run main.go jaeger -run 20260429-120000 -case weather-single-sequential
 
@@ -47,7 +44,6 @@ Commands:
   list      Print configured examples, specs, query files, and profiles.
   build     Generate deployment output under .builds/<example>/<spec>.
   run       Generate builds, start Docker Compose, run fixed-count load, save results.
-  smoke     Generate builds, start Docker Compose, run one request per example/spec profile.
   summary   Print a compact table from saved summary.json files.
   jaeger    Start Jaeger UI over one saved case's jaeger/ directory.
 

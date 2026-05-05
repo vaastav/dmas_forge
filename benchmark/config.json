@@ -2,6 +2,13 @@
   "mock": true,
   "profiles": [
     {
+      "name": "smoke",
+      "mode": "requests",
+      "value": 1,
+      "concurrency": 1,
+      "timeout_seconds": 900
+    },
+    {
       "name": "sequential",
       "mode": "requests",
       "value": 10,

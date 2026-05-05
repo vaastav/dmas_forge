@@ -12,11 +12,8 @@ import (
 	"github.com/vaastav/agentic_blueprint/benchmark/runner/execute"
 )
 
-func commandRun(args []string, smoke bool) error {
+func commandRun(args []string) error {
 	commandName := "run"
-	if smoke {
-		commandName = "smoke"
-	}
 	fs := flag.NewFlagSet(commandName, flag.ContinueOnError)
 	fs.SetOutput(os.Stdout)
 	configPath := fs.String("config", "config.json", "config file")
@@ -59,14 +56,6 @@ func commandRun(args []string, smoke bool) error {
 	if len(cases) == 0 {
 		return fmt.Errorf("no benchmark cases matched")
 	}
-	if smoke {
-		for i := range cases {
-			cases[i].Profile.Mode = "requests"
-			cases[i].Profile.Value = 1
-			cases[i].Profile.Concurrency = 1
-		}
-	}
-
 	return execute.Run(execute.RunOptions{
 		RepoRoot: repoRoot,
 		BenchDir: benchDir,
