@@ -16,6 +16,13 @@
       "timeout_seconds": 900
     },
     {
+      "name": "short-sequential",
+      "mode": "timed",
+      "value": 300,
+      "concurrency": 1,
+      "timeout_seconds": 900
+    },
+    {
       "name": "light",
       "mode": "requests",
       "value": 25,
