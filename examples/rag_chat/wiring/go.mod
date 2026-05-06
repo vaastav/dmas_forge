@@ -4,8 +4,6 @@ go 1.23.0
 
 require github.com/vaastav/dmas_forge/examples/rag_chat/workflow v0.0.0
 
-require github.com/vaastav/dmas_forge/ai_plugins v0.0.0
-
 require (
 	github.com/blueprint-uservices/blueprint/runtime v0.0.0-20240405152959-f078915d2306 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
@@ -34,11 +32,8 @@ require (
 require (
 	github.com/blueprint-uservices/blueprint/blueprint v0.0.0-20250729202253-a8f505263256
 	github.com/blueprint-uservices/blueprint/plugins v0.0.0-20250729202253-a8f505263256
-	github.com/vaastav/dmas_forge/ai_runtime v0.0.0
+	github.com/vaastav/dmas_forge/ai_plugins v0.0.0-20260506011127-3725bf4e6864
+	github.com/vaastav/dmas_forge/ai_runtime v0.0.0-20260506010313-a64618e2c60b
 )
 
 replace github.com/vaastav/dmas_forge/examples/rag_chat/workflow => ../workflow
-
-replace github.com/vaastav/dmas_forge/ai_runtime => ../../../ai_runtime
-
-replace github.com/vaastav/dmas_forge/ai_plugins => ../../../ai_plugins

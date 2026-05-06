@@ -4,8 +4,6 @@ go 1.23.0
 
 require github.com/vaastav/dmas_forge/examples/financial-analyzer/workflow v0.0.0
 
-require github.com/vaastav/dmas_forge/ai_plugins v0.0.0
-
 require (
 	github.com/blueprint-uservices/blueprint/runtime v0.0.0-20240405152959-f078915d2306 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
@@ -18,6 +16,7 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
+	github.com/vaastav/dmas_forge/ai_runtime v0.0.0-20260506010313-a64618e2c60b // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.mongodb.org/mongo-driver v1.15.0 // indirect
 	go.opentelemetry.io/otel v1.26.0 // indirect
@@ -38,11 +37,7 @@ require (
 require (
 	github.com/blueprint-uservices/blueprint/blueprint v0.0.0-20250729202253-a8f505263256
 	github.com/blueprint-uservices/blueprint/plugins v0.0.0-20250729202253-a8f505263256
-	github.com/vaastav/dmas_forge/ai_runtime v0.0.0 // indirect
+	github.com/vaastav/dmas_forge/ai_plugins v0.0.0-20260506011127-3725bf4e6864
 )
 
 replace github.com/vaastav/dmas_forge/examples/financial-analyzer/workflow => ../workflow
-
-replace github.com/vaastav/dmas_forge/ai_runtime => ../../../ai_runtime
-
-replace github.com/vaastav/dmas_forge/ai_plugins => ../../../ai_plugins
