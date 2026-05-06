@@ -14,27 +14,32 @@ import (
 )
 
 type OpenAILLMClient struct {
-	hasSysMsg     bool
-	tool_map      map[string]openai.ChatCompletionToolParam
-	tools         []openai.ChatCompletionToolParam
-	sysMsg        string
-	client        *openai.Client
-	model         string
-	toolHandlerFn core.ToolHandlerFn
-	maxToolRounds int
+	hasSysMsg              bool
+	tool_map               map[string]openai.ChatCompletionToolParam
+	tools                  []openai.ChatCompletionToolParam
+	sysMsg                 string
+	client                 *openai.Client
+	model                  string
+	toolHandlerFn          core.ToolHandlerFn
+	maxToolRounds          int
+	failOnToolHandlerError bool
 }
 
 // NewOpenAILLMClient creates a new OpenAI LLM client.
 // The maxToolRounds parameter specifies the maximum number of tool-call
 // round-trips allowed in a single LLMCallWithTools invocation.
 // If maxToolRounds is empty, unparseable, 0, or negative, the default value of 10 is used.
-func NewOpenAILLMClient(ctx context.Context, url string, apikey string, model_name string, maxToolRounds string) (*OpenAILLMClient, error) {
+func NewOpenAILLMClient(ctx context.Context, url string, apikey string, model_name string, maxToolRounds string, failOnToolHandlerError string) (*OpenAILLMClient, error) {
 	client := openai.NewClient(option.WithBaseURL(url), option.WithAPIKey(apikey))
 	maxRounds, err := strconv.Atoi(maxToolRounds)
 	if err != nil || maxRounds <= 0 {
 		maxRounds = defaultMaxToolRounds
 	}
-	return &OpenAILLMClient{client: &client, tool_map: make(map[string]openai.ChatCompletionToolParam), model: model_name, maxToolRounds: maxRounds}, nil
+	failFast, err := strconv.ParseBool(failOnToolHandlerError)
+	if err != nil {
+		failFast = false
+	}
+	return &OpenAILLMClient{client: &client, tool_map: make(map[string]openai.ChatCompletionToolParam), model: model_name, maxToolRounds: maxRounds, failOnToolHandlerError: failFast}, nil
 }
 
 func (c *OpenAILLMClient) AddSystemPrompt(ctx context.Context, prompt string) error {
@@ -125,6 +130,7 @@ func (c *OpenAILLMClient) LLMCallWithTools(ctx context.Context, query string) (s
 	var totalTokens int64
 	tokenUsageAvailable := false
 	toolCallCount := 0
+	toolCallErrorCount := 0
 
 	for round := range c.maxToolRounds {
 		completion, err := c.client.Chat.Completions.New(ctx, params)
@@ -148,7 +154,10 @@ func (c *OpenAILLMClient) LLMCallWithTools(ctx context.Context, query string) (s
 		toolCalls := choice.Message.ToolCalls
 		if len(toolCalls) == 0 {
 			setAggregatedTokenAttributes(span, tokenUsageAvailable, inputTokens, outputTokens, totalTokens)
-			span.SetAttributes(attribute.Int("llm.tool_call_count", toolCallCount))
+			span.SetAttributes(
+				attribute.Int("llm.tool_call_count", toolCallCount),
+				attribute.Int("llm.tool_call_error_count", toolCallErrorCount),
+			)
 			return choice.Message.Content, nil
 		}
 
@@ -165,11 +174,19 @@ func (c *OpenAILLMClient) LLMCallWithTools(ctx context.Context, query string) (s
 			)
 			res, err := c.toolHandlerFn(toolCtx, toolCall)
 			if err != nil {
-				// Abort if the tool handler function was unable to handle the tool call
 				recordSpanError(toolSpan, err)
 				toolSpan.End()
-				recordSpanError(span, err)
-				return "", err
+				toolCallErrorCount++
+				if c.failOnToolHandlerError || round == c.maxToolRounds-1 {
+					span.SetAttributes(
+						attribute.Int("llm.tool_call_count", toolCallCount),
+						attribute.Int("llm.tool_call_error_count", toolCallErrorCount),
+					)
+					recordSpanError(span, err)
+					return "", err
+				}
+				params.Messages = append(params.Messages, openai.ToolMessage("Error: "+err.Error(), toolCall.ID))
+				continue
 			}
 			toolSpan.SetStatus(codes.Ok, "")
 			toolSpan.End()
@@ -199,6 +216,7 @@ func (c *OpenAILLMClient) LLMCallWithTools(ctx context.Context, query string) (s
 	setAggregatedTokenAttributes(span, tokenUsageAvailable, inputTokens, outputTokens, totalTokens)
 	span.SetAttributes(
 		attribute.Int("llm.tool_call_count", toolCallCount),
+		attribute.Int("llm.tool_call_error_count", toolCallErrorCount),
 		attribute.Bool("llm.max_tool_rounds_exhausted", true),
 	)
 	return choice.Message.Content, nil

@@ -17,20 +17,21 @@ type AgentClient struct {
 	ir.IRNode
 	service.ServiceNode
 
-	Spec          *workflowspec.Service
-	ClientName    string
-	URL           string
-	Key           string
-	Model         string
-	MaxToolRounds int
+	Spec                   *workflowspec.Service
+	ClientName             string
+	URL                    string
+	Key                    string
+	Model                  string
+	MaxToolRounds          int
+	FailOnToolHandlerError bool
 }
 
-func newAgentClient(name string, url string, key string, model string, maxToolRounds int) (*AgentClient, error) {
+func newAgentClient(name string, url string, key string, model string, maxToolRounds int, failOnToolHandlerError bool) (*AgentClient, error) {
 	spec, err := workflowspec.GetService[openaiagent.OpenAILLMClient]()
 	if err != nil {
 		return nil, err
 	}
-	return &AgentClient{Spec: spec, ClientName: name, URL: url, Key: key, Model: model, MaxToolRounds: maxToolRounds}, nil
+	return &AgentClient{Spec: spec, ClientName: name, URL: url, Key: key, Model: model, MaxToolRounds: maxToolRounds, FailOnToolHandlerError: failOnToolHandlerError}, nil
 }
 
 // Implements ir.IRNode
@@ -52,7 +53,7 @@ func (node *AgentClient) AddInstantiation(builder golang.NamespaceBuilder) error
 	slog.Info(fmt.Sprintf("Instantiating AgentClient %v in %v/%v", node.ClientName, builder.Info().Package.PackageName, builder.Info().FileName))
 
 	constructor := node.Spec.Constructor.AsConstructor()
-	return builder.DeclareConstructor(node.ClientName, constructor, []ir.IRNode{&ir.IRValue{Value: node.URL}, &ir.IRValue{Value: node.Key}, &ir.IRValue{Value: node.Model}, &ir.IRValue{Value: strconv.Itoa(node.MaxToolRounds)}})
+	return builder.DeclareConstructor(node.ClientName, constructor, []ir.IRNode{&ir.IRValue{Value: node.URL}, &ir.IRValue{Value: node.Key}, &ir.IRValue{Value: node.Model}, &ir.IRValue{Value: strconv.Itoa(node.MaxToolRounds)}, &ir.IRValue{Value: strconv.FormatBool(node.FailOnToolHandlerError)}})
 }
 
 // Implements golang.ProvidesModule

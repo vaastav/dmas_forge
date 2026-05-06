@@ -13,6 +13,11 @@ type AgentConfig struct {
 	// in a single LLMCallWithTools invocation.
 	// If set to 0 (or unset), the default value of 10 is used.
 	MaxToolRounds int
+
+	// FailOnToolHandlerError preserves fail-fast behavior for tool handler errors.
+	// If false, handler errors are returned to the model as tool messages until
+	// the final allowed tool round.
+	FailOnToolHandlerError bool
 }
 
 // OpenAILLMAgent creates an OpenAI LLM agent with the given configuration.
@@ -23,7 +28,7 @@ func OpenAILLMAgent(spec wiring.WiringSpec, agent_name string, url string, apike
 	agentBackendName := agent_name + ".openai_agent"
 
 	spec.Define(agentBackendName, &AgentClient{}, func(namespace wiring.Namespace) (ir.IRNode, error) {
-		return newAgentClient(agent_name, url, apikey, model_name, config.MaxToolRounds)
+		return newAgentClient(agent_name, url, apikey, model_name, config.MaxToolRounds, config.FailOnToolHandlerError)
 	})
 
 	pointer.CreatePointer[*AgentClient](spec, agent_name, agentBackendName)
