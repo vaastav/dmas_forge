@@ -5,7 +5,7 @@ go 1.23.0
 require (
 	github.com/modelcontextprotocol/go-sdk v1.3.0
 	github.com/openai/openai-go v1.11.1
-	github.com/vaastav/dmas_forge/ai_runtime v0.0.0
+	github.com/vaastav/dmas_forge/ai_runtime v0.0.0-20260506010313-a64618e2c60b
 )
 
 require (
@@ -17,5 +17,3 @@ require (
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 )
-
-replace github.com/vaastav/dmas_forge/ai_runtime => ../../../ai_runtime

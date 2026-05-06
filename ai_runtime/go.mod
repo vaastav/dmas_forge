@@ -2,8 +2,6 @@ module github.com/vaastav/dmas_forge/ai_runtime
 
 go 1.23.0
 
-toolchain go1.23.0
-
 require github.com/openai/openai-go v1.11.1
 
 require (

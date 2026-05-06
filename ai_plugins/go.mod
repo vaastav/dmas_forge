@@ -5,6 +5,7 @@ go 1.23.0
 require (
 	github.com/blueprint-uservices/blueprint/blueprint v0.0.0-20250729202253-a8f505263256
 	github.com/blueprint-uservices/blueprint/plugins v0.0.0-20250729202253-a8f505263256
+	github.com/vaastav/dmas_forge/ai_runtime v0.0.0-20260506010313-a64618e2c60b
 )
 
 require (
