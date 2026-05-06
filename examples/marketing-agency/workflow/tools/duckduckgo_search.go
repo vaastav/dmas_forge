@@ -13,7 +13,7 @@ import (
 	"time"
 
 	openai "github.com/openai/openai-go"
-	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
+	"github.com/vaastav/dmas_forge/ai_runtime/core"
 )
 
 type SearchResult struct {

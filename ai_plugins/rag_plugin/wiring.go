@@ -38,8 +38,8 @@ import (
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/coreplugins/pointer"
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/ir"
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/wiring"
-	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
-	ragruntime "github.com/vaastav/agentic_blueprint/ai_runtime/plugins/rag"
+	"github.com/vaastav/dmas_forge/ai_runtime/core"
+	ragruntime "github.com/vaastav/dmas_forge/ai_runtime/plugins/rag"
 )
 
 // KnowledgeBase creates a Blueprint service node for a custom KnowledgeBase

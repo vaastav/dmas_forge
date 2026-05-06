@@ -3,7 +3,7 @@
 # rag
 
 ```go
-import "github.com/vaastav/agentic_blueprint/ai_runtime/plugins/rag"
+import "github.com/vaastav/dmas_forge/ai_runtime/plugins/rag"
 ```
 
 Package rag provides retrieval\-augmented generation capabilities for agents.

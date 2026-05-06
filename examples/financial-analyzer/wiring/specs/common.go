@@ -6,9 +6,9 @@ import (
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/wiring"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
 
-	"github.com/vaastav/agentic_blueprint/ai_plugins/model"
-	"github.com/vaastav/agentic_blueprint/ai_plugins/openai_plugin"
-	wf "github.com/vaastav/agentic_blueprint/examples/financial-analyzer/workflow"
+	"github.com/vaastav/dmas_forge/ai_plugins/model"
+	"github.com/vaastav/dmas_forge/ai_plugins/openai_plugin"
+	wf "github.com/vaastav/dmas_forge/examples/financial-analyzer/workflow"
 )
 
 var mcpServers = flag.String("mcp-servers", "http://localhost:8080", "Comma-separated list of MCP server URLs for search/fetch tools")

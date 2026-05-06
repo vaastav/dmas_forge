@@ -9,7 +9,7 @@ import (
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/ir"
 	"github.com/blueprint-uservices/blueprint/plugins/golang"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow/workflowspec"
-	ragruntime "github.com/vaastav/agentic_blueprint/ai_runtime/plugins/rag"
+	ragruntime "github.com/vaastav/dmas_forge/ai_runtime/plugins/rag"
 )
 
 // RAGAgentClient is the Blueprint IR node for a RAG-enabled agent. It adds RAG

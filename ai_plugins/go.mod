@@ -1,4 +1,4 @@
-module github.com/vaastav/agentic_blueprint/ai_plugins
+module github.com/vaastav/dmas_forge/ai_plugins
 
 go 1.23.0
 
@@ -6,10 +6,6 @@ require (
 	github.com/blueprint-uservices/blueprint/blueprint v0.0.0-20250729202253-a8f505263256
 	github.com/blueprint-uservices/blueprint/plugins v0.0.0-20250729202253-a8f505263256
 )
-
-require github.com/vaastav/agentic_blueprint/ai_runtime v0.0.0
-
-replace github.com/vaastav/agentic_blueprint/ai_runtime => ../ai_runtime
 
 require (
 	github.com/google/go-cmp v0.7.0 // indirect

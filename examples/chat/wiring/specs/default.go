@@ -8,11 +8,11 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
 
-	"github.com/vaastav/agentic_blueprint/ai_plugins/memory_plugin"
-	"github.com/vaastav/agentic_blueprint/ai_plugins/model"
-	"github.com/vaastav/agentic_blueprint/ai_plugins/openai_plugin"
-	"github.com/vaastav/agentic_blueprint/ai_runtime/plugins/memory"
-	wf "github.com/vaastav/agentic_blueprint/examples/chat/workflow"
+	"github.com/vaastav/dmas_forge/ai_plugins/memory_plugin"
+	"github.com/vaastav/dmas_forge/ai_plugins/model"
+	"github.com/vaastav/dmas_forge/ai_plugins/openai_plugin"
+	"github.com/vaastav/dmas_forge/ai_runtime/plugins/memory"
+	wf "github.com/vaastav/dmas_forge/examples/chat/workflow"
 )
 
 var Memory = cmdbuilder.SpecOption{

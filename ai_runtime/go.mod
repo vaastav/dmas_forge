@@ -1,8 +1,8 @@
-module github.com/vaastav/agentic_blueprint/ai_runtime
+module github.com/vaastav/dmas_forge/ai_runtime
 
-go 1.22.0
+go 1.23.0
 
-toolchain go1.22.1
+toolchain go1.23.0
 
 require github.com/openai/openai-go v1.11.1
 

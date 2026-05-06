@@ -6,7 +6,7 @@ import (
 
 	openai "github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
-	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
+	"github.com/vaastav/dmas_forge/ai_runtime/core"
 )
 
 type OpenAILLMClient struct {

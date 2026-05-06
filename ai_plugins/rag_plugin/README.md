@@ -3,7 +3,7 @@
 # rag\_plugin
 
 ```go
-import "github.com/vaastav/agentic_blueprint/ai_plugins/rag_plugin"
+import "github.com/vaastav/dmas_forge/ai_plugins/rag_plugin"
 ```
 
 Package rag\_plugin provides Blueprint IR nodes and wiring functions for RAG \(Retrieval\-Augmented Generation\) capabilities.

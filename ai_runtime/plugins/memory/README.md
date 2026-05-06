@@ -3,7 +3,7 @@
 # memory
 
 ```go
-import "github.com/vaastav/agentic_blueprint/ai_runtime/plugins/memory"
+import "github.com/vaastav/dmas_forge/ai_runtime/plugins/memory"
 ```
 
 Package memory provides LLM\-driven memory capabilities for agents.

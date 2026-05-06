@@ -1,8 +1,8 @@
-module github.com/vaastav/agentic_blueprint/examples/weather/workflow
+module github.com/vaastav/dmas_forge/examples/weather/workflow
 
-go 1.22.1
+go 1.23.0
 
-require github.com/vaastav/agentic_blueprint/ai_runtime v0.0.0
+require github.com/vaastav/dmas_forge/ai_runtime v0.0.0
 
 require (
 	github.com/openai/openai-go v1.11.1 // indirect
@@ -12,4 +12,4 @@ require (
 	github.com/tidwall/sjson v1.2.5 // indirect
 )
 
-replace github.com/vaastav/agentic_blueprint/ai_runtime => ../../../ai_runtime
+replace github.com/vaastav/dmas_forge/ai_runtime => ../../../ai_runtime

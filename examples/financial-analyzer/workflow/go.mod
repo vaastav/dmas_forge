@@ -1,11 +1,11 @@
-module github.com/vaastav/agentic_blueprint/examples/financial-analyzer/workflow
+module github.com/vaastav/dmas_forge/examples/financial-analyzer/workflow
 
 go 1.23.0
 
 require (
 	github.com/modelcontextprotocol/go-sdk v1.3.0
 	github.com/openai/openai-go v1.11.1
-	github.com/vaastav/agentic_blueprint/ai_runtime v0.0.0
+	github.com/vaastav/dmas_forge/ai_runtime v0.0.0
 )
 
 require (
@@ -18,4 +18,4 @@ require (
 	golang.org/x/oauth2 v0.30.0 // indirect
 )
 
-replace github.com/vaastav/agentic_blueprint/ai_runtime => ../../../ai_runtime
+replace github.com/vaastav/dmas_forge/ai_runtime => ../../../ai_runtime

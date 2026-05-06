@@ -5,7 +5,7 @@ import (
 	"maps"
 	"strings"
 
-	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
+	"github.com/vaastav/dmas_forge/ai_runtime/core"
 )
 
 const (

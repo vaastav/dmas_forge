@@ -9,7 +9,7 @@ import (
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/ir"
 	"github.com/blueprint-uservices/blueprint/plugins/golang"
 	"github.com/blueprint-uservices/blueprint/plugins/golang/gocode"
-	"github.com/vaastav/agentic_blueprint/ai_plugins/mcp/mcpcodegen"
+	"github.com/vaastav/dmas_forge/ai_plugins/mcp/mcpcodegen"
 )
 
 type mcpServer struct {

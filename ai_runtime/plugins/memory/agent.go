@@ -44,7 +44,7 @@ import (
 	"strings"
 
 	openai "github.com/openai/openai-go"
-	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
+	"github.com/vaastav/dmas_forge/ai_runtime/core"
 )
 
 const memorySystemPromptSuffix = "\n\nYou have access to a persistent long-term memory. " +

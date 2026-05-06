@@ -7,12 +7,12 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/http"
 	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
-	"github.com/vaastav/agentic_blueprint/ai_plugins/model"
-	"github.com/vaastav/agentic_blueprint/ai_plugins/openai_plugin"
-	"github.com/vaastav/agentic_blueprint/ai_plugins/rag_plugin"
-	ragruntime "github.com/vaastav/agentic_blueprint/ai_runtime/plugins/rag"
-	"github.com/vaastav/agentic_blueprint/ai_runtime/plugins/vectorstore"
-	wf "github.com/vaastav/agentic_blueprint/examples/rag_chat/workflow"
+	"github.com/vaastav/dmas_forge/ai_plugins/model"
+	"github.com/vaastav/dmas_forge/ai_plugins/openai_plugin"
+	"github.com/vaastav/dmas_forge/ai_plugins/rag_plugin"
+	ragruntime "github.com/vaastav/dmas_forge/ai_runtime/plugins/rag"
+	"github.com/vaastav/dmas_forge/ai_runtime/plugins/vectorstore"
+	wf "github.com/vaastav/dmas_forge/examples/rag_chat/workflow"
 )
 
 var Automatic = cmdbuilder.SpecOption{

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
+	"github.com/vaastav/dmas_forge/ai_runtime/core"
 )
 
 const websiteAgentPrompt = `Role: You are a highly accurate AI assistant specializing in crafting well-structured, visually appealing, and modern websites. Your creations should be user-friendly, responsive by default, and incorporate best practices for web design.

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
-	"github.com/vaastav/agentic_blueprint/examples/financial-analyzer/workflow/prompts"
+	"github.com/vaastav/dmas_forge/ai_runtime/core"
+	"github.com/vaastav/dmas_forge/examples/financial-analyzer/workflow/prompts"
 )
 
 type FinancialAnalystAgentImpl struct {

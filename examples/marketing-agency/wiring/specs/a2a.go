@@ -6,7 +6,7 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/goproc"
 	"github.com/blueprint-uservices/blueprint/plugins/http"
 	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
-	"github.com/vaastav/agentic_blueprint/ai_plugins/a2a"
+	"github.com/vaastav/dmas_forge/ai_plugins/a2a"
 )
 
 var A2A = cmdbuilder.SpecOption{

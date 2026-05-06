@@ -8,8 +8,8 @@ import (
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/ir"
 	"github.com/blueprint-uservices/blueprint/plugins/golang"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow/workflowspec"
-	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
-	"github.com/vaastav/agentic_blueprint/ai_runtime/plugins/memory"
+	"github.com/vaastav/dmas_forge/ai_runtime/core"
+	"github.com/vaastav/dmas_forge/ai_runtime/plugins/memory"
 )
 
 // MemoryStoreClient is the IR node for a memory store instance.

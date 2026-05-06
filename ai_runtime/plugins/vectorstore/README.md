@@ -3,7 +3,7 @@
 # vectorstore
 
 ```go
-import "github.com/vaastav/agentic_blueprint/ai_runtime/plugins/vectorstore"
+import "github.com/vaastav/dmas_forge/ai_runtime/plugins/vectorstore"
 ```
 
 Package vectorstore provides in\-memory vector storage implementations. The InMemoryVectorStore is suitable for development and testing, but production deployments should use a persistent vector database.

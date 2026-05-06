@@ -3,7 +3,7 @@ package workflow
 import (
 	"context"
 
-	"github.com/vaastav/agentic_blueprint/ai_runtime/core"
+	"github.com/vaastav/dmas_forge/ai_runtime/core"
 )
 
 // ChatAgent is a simple conversational agent interface.

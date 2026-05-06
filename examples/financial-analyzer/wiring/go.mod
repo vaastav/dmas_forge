@@ -1,10 +1,10 @@
-module github.com/vaastav/agentic_blueprint/examples/financial-analyzer/wiring
+module github.com/vaastav/dmas_forge/examples/financial-analyzer/wiring
 
 go 1.23.0
 
-require github.com/vaastav/agentic_blueprint/examples/financial-analyzer/workflow v0.0.0
+require github.com/vaastav/dmas_forge/examples/financial-analyzer/workflow v0.0.0
 
-require github.com/vaastav/agentic_blueprint/ai_plugins v0.0.0
+require github.com/vaastav/dmas_forge/ai_plugins v0.0.0
 
 require (
 	github.com/blueprint-uservices/blueprint/runtime v0.0.0-20240405152959-f078915d2306 // indirect
@@ -38,11 +38,11 @@ require (
 require (
 	github.com/blueprint-uservices/blueprint/blueprint v0.0.0-20250729202253-a8f505263256
 	github.com/blueprint-uservices/blueprint/plugins v0.0.0-20250729202253-a8f505263256
-	github.com/vaastav/agentic_blueprint/ai_runtime v0.0.0 // indirect
+	github.com/vaastav/dmas_forge/ai_runtime v0.0.0 // indirect
 )
 
-replace github.com/vaastav/agentic_blueprint/examples/financial-analyzer/workflow => ../workflow
+replace github.com/vaastav/dmas_forge/examples/financial-analyzer/workflow => ../workflow
 
-replace github.com/vaastav/agentic_blueprint/ai_runtime => ../../../ai_runtime
+replace github.com/vaastav/dmas_forge/ai_runtime => ../../../ai_runtime
 
-replace github.com/vaastav/agentic_blueprint/ai_plugins => ../../../ai_plugins
+replace github.com/vaastav/dmas_forge/ai_plugins => ../../../ai_plugins

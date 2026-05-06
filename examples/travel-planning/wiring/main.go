@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/blueprint-uservices/blueprint/plugins/cmdbuilder"
-	"github.com/vaastav/agentic_blueprint/examples/travel-planning/wiring/specs"
+	"github.com/vaastav/dmas_forge/examples/travel-planning/wiring/specs"
 )
 
 func main() {

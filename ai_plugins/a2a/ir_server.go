@@ -10,7 +10,7 @@ import (
 	"github.com/blueprint-uservices/blueprint/blueprint/pkg/ir"
 	"github.com/blueprint-uservices/blueprint/plugins/golang"
 	"github.com/blueprint-uservices/blueprint/plugins/golang/gocode"
-	"github.com/vaastav/agentic_blueprint/ai_plugins/a2a/a2acodegen"
+	"github.com/vaastav/dmas_forge/ai_plugins/a2a/a2acodegen"
 )
 
 // IRNode representing a Golang A2A server.

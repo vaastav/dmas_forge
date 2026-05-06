@@ -3,7 +3,7 @@
 # memory\_plugin
 
 ```go
-import "github.com/vaastav/agentic_blueprint/ai_plugins/memory_plugin"
+import "github.com/vaastav/dmas_forge/ai_plugins/memory_plugin"
 ```
 
 Package memory\_plugin provides wiring functions for memory\-backed agents. Use MemoryStore\[Impl\] to create a memory store with any core.Memory implementation, and MemoryAgent to wrap an agent with LLM\-driven memory capabilities.

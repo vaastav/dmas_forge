@@ -7,10 +7,10 @@ import (
 	"github.com/blueprint-uservices/blueprint/plugins/http"
 	"github.com/blueprint-uservices/blueprint/plugins/linuxcontainer"
 	"github.com/blueprint-uservices/blueprint/plugins/workflow"
-	"github.com/vaastav/agentic_blueprint/ai_plugins/mcp"
-	"github.com/vaastav/agentic_blueprint/ai_plugins/model"
-	"github.com/vaastav/agentic_blueprint/ai_plugins/openai_plugin"
-	wf "github.com/vaastav/agentic_blueprint/examples/weather/workflow"
+	"github.com/vaastav/dmas_forge/ai_plugins/mcp"
+	"github.com/vaastav/dmas_forge/ai_plugins/model"
+	"github.com/vaastav/dmas_forge/ai_plugins/openai_plugin"
+	wf "github.com/vaastav/dmas_forge/examples/weather/workflow"
 )
 
 var MCP = cmdbuilder.SpecOption{
