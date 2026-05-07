@@ -50,22 +50,11 @@ func NewFinancialAnalyzerCoordinatorImpl(
 	return a, nil
 }
 
-const (
-	sanityModeTimeout = 3 * time.Minute
-	fullModeTimeout   = 10 * time.Minute
-)
-
 func (a *FinancialAnalyzerCoordinatorImpl) Analyze(ctx context.Context, requestedCompany string, requestedMode string) (AnalysisResult, error) {
 	company, mode, err := requireCompanyAndMode(requestedCompany, requestedMode)
 	if err != nil {
 		return AnalysisResult{}, err
 	}
-	timeout := sanityModeTimeout
-	if mode == ModeFull {
-		timeout = fullModeTimeout
-	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
 
 	result := &AnalysisResult{
 		Company: company,
