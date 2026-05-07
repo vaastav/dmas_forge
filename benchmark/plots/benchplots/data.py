@@ -321,7 +321,10 @@ def _expected_cases(run_info: dict[str, Any], cases: pd.DataFrame) -> pd.DataFra
     global_profiles = cfg.get("profiles", []) if isinstance(cfg.get("profiles"), list) else []
     examples = cfg.get("examples", []) if isinstance(cfg.get("examples"), list) else []
     rows: list[dict[str, Any]] = []
-    present = set(cases["case_name"].astype(str)) if not cases.empty and "case_name" in cases else set()
+    present = set(cases["case_name"].astype(str)) if "case_name" in cases else set()
+    case_examples = set(cases["example"].astype(str)) if "example" in cases else set()
+    case_specs = set(cases["spec"].astype(str)) if "spec" in cases else set()
+    case_profiles = set(cases["profile"].astype(str)) if "profile" in cases else set()
 
     for ex in examples:
         if not isinstance(ex, dict):
@@ -353,12 +356,12 @@ def _expected_cases(run_info: dict[str, Any], cases: pd.DataFrame) -> pd.DataFra
                     }
                 )
     configured_names = {row["case_name"] for row in rows}
-    comparison_examples = sorted(selected_examples or {row["example"] for row in rows} or set(cases["example"].astype(str)))
-    comparison_specs = [spec for spec in SPEC_ORDER if (not selected_specs or spec in selected_specs) and (spec in selected_specs or spec in set(cases["spec"].astype(str)))]
+    comparison_examples = sorted(selected_examples or {row["example"] for row in rows} or case_examples)
+    comparison_specs = [spec for spec in SPEC_ORDER if (not selected_specs or spec in selected_specs) and (spec in selected_specs or spec in case_specs)]
     profile_names = {p.get("name", "") for p in global_profiles if isinstance(p, dict)}
     profile_names.update(str(p) for p in selected_profiles)
-    if not profile_names and not cases.empty:
-        profile_names.update(cases["profile"].astype(str))
+    if not profile_names:
+        profile_names.update(case_profiles)
     ordered_profile_names = [profile for profile in PROFILE_ORDER if profile in profile_names]
     ordered_profile_names.extend(sorted(profile_names - set(ordered_profile_names)))
     comparison_profiles = ordered_profile_names

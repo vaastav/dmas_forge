@@ -40,7 +40,7 @@ def generate_plots(data: BenchmarkRun, out_dir: Path, max_case_waterfalls: int =
         (out_dir / name).mkdir(parents=True, exist_ok=True)
     write_normalized_data(data, out_dir)
 
-    index: dict[str, Any] = {"sections": defaultdict(list), "cases": []}
+    index: dict[str, Any] = {"sections": defaultdict(list), "cases": [], "_out_dir": out_dir}
     _overview_plots(data, out_dir, index)
     _performance_plots(data, out_dir, index)
     _reliability_plots(data, out_dir, index)
@@ -51,6 +51,7 @@ def generate_plots(data: BenchmarkRun, out_dir: Path, max_case_waterfalls: int =
     _example_plots(data, out_dir, index)
     _case_plots(data, out_dir, index, max_case_waterfalls)
     index["sections"] = dict(index["sections"])
+    index.pop("_out_dir", None)
     return index
 
 
@@ -435,6 +436,10 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
         return
 
     examples: list[dict[str, Any]] = []
+    expected_by_example = _groups(expected, "example")
+    requests_by_example = _groups(requests, "example")
+    components_by_example = _groups(components, "example")
+    empty = pd.DataFrame()
     for example, ex_cases in cases.groupby("example", observed=True):
         example = str(example)
         slug = _slug(example)
@@ -442,7 +447,7 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
         example_dir.mkdir(parents=True, exist_ok=True)
         entry = {"example": example, "slug": slug, "path": f"examples/{slug}/index.html", "plots": []}
 
-        ex_expected = expected[expected["example"].astype(str) == example] if not expected.empty else ex_cases
+        ex_expected = expected_by_example.get(example, ex_cases)
         merged = ex_expected.merge(
             ex_cases[["case_name", "success_rate"]],
             on="case_name",
@@ -470,7 +475,7 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
         ax.set_title(f"{example}: Success Rate", loc="left", pad=14)
         ax.set_xlabel("")
         ax.set_ylabel("")
-        entry["plots"].append({"title": "Success-rate heatmap", "path": _save(fig, example_dir / "success_rate_heatmap.png")})
+        entry["plots"].append({"title": "Success-rate heatmap", "path": _save(fig, example_dir / "success_rate_heatmap.png", index)})
 
         latency = ex_cases.melt(
             id_vars=["case_name", "spec", "profile"],
@@ -486,7 +491,7 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
         ax.set_ylabel("latency (ms)")
         ax.tick_params(axis="x", rotation=35)
         _outside_legend(ax, "Percentile")
-        entry["plots"].append({"title": "Latency percentiles", "path": _save(fig, example_dir / "latency_percentiles.png")})
+        entry["plots"].append({"title": "Latency percentiles", "path": _save(fig, example_dir / "latency_percentiles.png", index)})
 
         fig, ax = plt.subplots(figsize=(14, 6))
         ex_cases = ex_cases.copy()
@@ -497,7 +502,7 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
         ax.set_ylabel("requests / second")
         ax.tick_params(axis="x", rotation=35)
         _outside_legend(ax, "Spec")
-        entry["plots"].append({"title": "Throughput", "path": _save(fig, example_dir / "throughput.png")})
+        entry["plots"].append({"title": "Throughput", "path": _save(fig, example_dir / "throughput.png", index)})
 
         token_plot = ex_cases.sort_values("total_tokens", ascending=False)
         fig, ax = plt.subplots(figsize=(14, 6))
@@ -507,9 +512,9 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
         ax.set_ylabel("tokens")
         ax.tick_params(axis="x", rotation=35)
         _outside_legend(ax, "Profile")
-        entry["plots"].append({"title": "Total tokens", "path": _save(fig, example_dir / "tokens.png")})
+        entry["plots"].append({"title": "Total tokens", "path": _save(fig, example_dir / "tokens.png", index)})
 
-        ex_requests = requests[requests["example"].astype(str) == example] if not requests.empty else pd.DataFrame()
+        ex_requests = requests_by_example.get(example, empty)
         if not ex_requests.empty:
             ex_requests = ex_requests.copy()
             ex_requests["case_axis"] = ex_requests["spec"].astype(str) + "\n" + ex_requests["profile"].astype(str)
@@ -530,14 +535,14 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
             ax.set_ylabel("latency (ms)")
             ax.tick_params(axis="x", rotation=35)
             _outside_legend(ax, "OK")
-            entry["plots"].append({"title": "Per-request latency", "path": _save(fig, example_dir / "request_latency.png")})
+            entry["plots"].append({"title": "Per-request latency", "path": _save(fig, example_dir / "request_latency.png", index)})
 
             fig = _draw_latency_distribution(
                 ex_requests,
                 title=f"{example}: Request Latency Distribution",
                 x_col="case_axis",
             )
-            entry["plots"].append({"title": "Request latency range", "path": _save(fig, example_dir / "request_latency_range.png")})
+            entry["plots"].append({"title": "Request latency range", "path": _save(fig, example_dir / "request_latency_range.png", index)})
 
             fig = _draw_latency_cdf(
                 ex_requests,
@@ -545,9 +550,9 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
                 group_col="case_axis",
                 legend_title="Spec / profile",
             )
-            entry["plots"].append({"title": "Request latency CDF", "path": _save(fig, example_dir / "request_latency_cdf.png")})
+            entry["plots"].append({"title": "Request latency CDF", "path": _save(fig, example_dir / "request_latency_cdf.png", index)})
 
-        ex_components = components[components["example"].astype(str) == example] if not components.empty else pd.DataFrame()
+        ex_components = components_by_example.get(example, empty)
         if not ex_components.empty:
             comp = ex_components.groupby("component", observed=True).agg(duration_ms=("duration_ms", "sum"), total_tokens=("total_tokens", "sum")).reset_index()
             comp = comp.sort_values("duration_ms", ascending=False).head(18)
@@ -556,7 +561,7 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
             ax.set_title(f"{example}: Component Duration", loc="left", pad=14)
             ax.set_xlabel("aggregate duration (ms)")
             ax.set_ylabel("")
-            entry["plots"].append({"title": "Component duration", "path": _save(fig, example_dir / "component_duration.png")})
+            entry["plots"].append({"title": "Component duration", "path": _save(fig, example_dir / "component_duration.png", index)})
 
         examples.append(entry)
 
@@ -570,12 +575,17 @@ def _case_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any], max_ca
     spans = data.spans
     components = data.components
     waterfalls = 0
+    requests_by_case = _groups(requests, "case_name")
+    resources_by_case = _groups(resources, "case_name")
+    spans_by_case = _groups(spans, "case_name")
+    components_by_case = _groups(components, "case_name")
+    empty = pd.DataFrame()
     for case in cases["case_name"].astype(str).tolist():
         case_dir = out_dir / "cases" / _slug(case)
         case_dir.mkdir(parents=True, exist_ok=True)
         case_entry: dict[str, Any] = {"case_name": case, "plots": []}
 
-        req = requests[requests["case_name"].astype(str) == case] if not requests.empty else pd.DataFrame()
+        req = requests_by_case.get(case, empty)
         if not req.empty:
             req = req.copy()
             fig, ax = plt.subplots(figsize=(9, 4.8))
@@ -585,7 +595,7 @@ def _case_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any], max_ca
             ax.set_xlabel("request sequence")
             ax.set_ylabel("latency (ms)")
             _outside_legend(ax, "OK")
-            case_entry["plots"].append(_save(fig, case_dir / "request_latency.png"))
+            case_entry["plots"].append(_save(fig, case_dir / "request_latency.png", index))
 
             req["outcome"] = req["ok"].map({True: "success", False: "failed"}).fillna("unknown")
             fig = _draw_latency_cdf(
@@ -594,9 +604,9 @@ def _case_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any], max_ca
                 group_col="outcome",
                 legend_title="Outcome",
             )
-            case_entry["plots"].append(_save(fig, case_dir / "request_latency_cdf.png"))
+            case_entry["plots"].append(_save(fig, case_dir / "request_latency_cdf.png", index))
 
-        res = resources[resources["case_name"].astype(str) == case] if not resources.empty else pd.DataFrame()
+        res = resources_by_case.get(case, empty)
         if not res.empty:
             res = res.copy()
             res["memory_mib"] = res["memory_bytes"] / 1024 / 1024
@@ -608,9 +618,9 @@ def _case_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any], max_ca
             axes[1].set_ylabel("MiB")
             axes[1].set_xlabel("elapsed seconds")
             _outside_legend(axes[1], "Container")
-            case_entry["plots"].append(_save(fig, case_dir / "resources.png"))
+            case_entry["plots"].append(_save(fig, case_dir / "resources.png", index))
 
-        comp = components[components["case_name"].astype(str) == case] if not components.empty else pd.DataFrame()
+        comp = components_by_case.get(case, empty)
         if not comp.empty:
             comp = comp.sort_values("duration_ms", ascending=False).head(18)
             fig, ax = plt.subplots(figsize=(9, max(4, len(comp) * 0.32)))
@@ -618,14 +628,14 @@ def _case_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any], max_ca
             ax.set_title(f"{case}: Component Duration", loc="left", pad=12)
             ax.set_xlabel("duration (ms)")
             ax.set_ylabel("")
-            case_entry["plots"].append(_save(fig, case_dir / "components.png"))
+            case_entry["plots"].append(_save(fig, case_dir / "components.png", index))
 
-        span_case = spans[spans["case_name"].astype(str) == case] if not spans.empty else pd.DataFrame()
+        span_case = spans_by_case.get(case, empty)
         if not span_case.empty and waterfalls < max_case_waterfalls:
             fig = _draw_longest_waterfall(case, span_case)
             if fig is not None:
                 waterfalls += 1
-                case_entry["plots"].append(_save(fig, case_dir / "longest_trace_waterfall.png"))
+                case_entry["plots"].append(_save(fig, case_dir / "longest_trace_waterfall.png", index))
 
         index["cases"].append(case_entry)
 
@@ -772,14 +782,20 @@ def _save(
     fig.tight_layout()
     fig.savefig(path, dpi=180, bbox_inches="tight")
     plt.close(fig)
-    rel = str(path)
-    if "out/" in rel:
-        rel = rel.split("out/", 1)[1].split("/", 1)[1]
-    else:
-        rel = path.name
+    rel = _relative_plot_path(path, index)
     if index is not None and section is not None and title is not None:
         index["sections"][section].append({"title": title, "path": rel.replace("\\", "/")})
     return rel.replace("\\", "/")
+
+
+def _relative_plot_path(path: Path, index: dict[str, Any] | None) -> str:
+    out_dir = index.get("_out_dir") if index is not None else None
+    if isinstance(out_dir, Path):
+        try:
+            return path.resolve().relative_to(out_dir.resolve()).as_posix()
+        except ValueError:
+            pass
+    return path.name
 
 
 def _placeholder(path: Path, text: str) -> None:
@@ -798,6 +814,12 @@ def _actual(frame: pd.DataFrame) -> pd.DataFrame:
         if col in out.columns:
             out[col] = out[col].astype(str)
     return out
+
+
+def _groups(frame: pd.DataFrame, column: str) -> dict[str, pd.DataFrame]:
+    if frame.empty or column not in frame:
+        return {}
+    return {str(key): group for key, group in frame.groupby(column, observed=True, sort=False)}
 
 
 def _set_style() -> None:

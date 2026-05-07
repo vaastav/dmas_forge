@@ -14,16 +14,17 @@ def write_report(data: BenchmarkRun, plot_index: dict[str, Any], out_dir: Path) 
     assets = out_dir / "assets"
     assets.mkdir(parents=True, exist_ok=True)
     (assets / "report.css").write_text(REPORT_CSS, encoding="utf-8")
-    html = _render(data, plot_index)
+    env = _template_env()
+    html = _render(env, data, plot_index)
     (out_dir / "index.html").write_text(html, encoding="utf-8")
     for example in plot_index.get("examples", []):
         page_path = out_dir / example["path"]
         page_path.parent.mkdir(parents=True, exist_ok=True)
-        page_path.write_text(_render_example(data, plot_index, example, out_dir, page_path.parent), encoding="utf-8")
+        page_path.write_text(_render_example(env, data, plot_index, example, out_dir, page_path.parent), encoding="utf-8")
 
 
-def _render(data: BenchmarkRun, plot_index: dict[str, Any]) -> str:
-    template = _template(REPORT_TEMPLATE)
+def _render(env: Environment, data: BenchmarkRun, plot_index: dict[str, Any]) -> str:
+    template = env.from_string(REPORT_TEMPLATE)
     cases = data.cases.copy()
     expected = data.expected_cases.copy()
     partial = cases[cases["errors"] > 0] if not cases.empty else pd.DataFrame()
@@ -51,13 +52,14 @@ def _render(data: BenchmarkRun, plot_index: dict[str, Any]) -> str:
 
 
 def _render_example(
+    env: Environment,
     data: BenchmarkRun,
     plot_index: dict[str, Any],
     example_entry: dict[str, Any],
     out_dir: Path,
     page_dir: Path,
 ) -> str:
-    template = _template(EXAMPLE_TEMPLATE)
+    template = env.from_string(EXAMPLE_TEMPLATE)
     example = example_entry["example"]
     cases = data.cases[data.cases["example"].astype(str) == example].copy() if not data.cases.empty else pd.DataFrame()
     expected = data.expected_cases[data.expected_cases["example"].astype(str) == example].copy() if not data.expected_cases.empty else pd.DataFrame()
@@ -100,10 +102,10 @@ def _render_example(
     )
 
 
-def _template(source: str):
+def _template_env() -> Environment:
     env = Environment(autoescape=select_autoescape(["html"]))
     env.globals["format_cell"] = format_cell
-    return env.from_string(source)
+    return env
 
 
 def _records(frame: pd.DataFrame) -> list[dict[str, Any]]:
