@@ -11,7 +11,7 @@ The plot generator reads saved benchmark artifacts from `benchmark/results/`, no
 ## What It Visualizes
 
 - Request success, partial failures, and failed cases
-- Latency: per-request points plus p50, p95, and p99 comparisons
+- Latency: per-request points, CDFs, plus p50, p95, and p99 comparisons
 - Throughput by example, spec, and profile
 - LLM token usage by case and component
 - Component duration and span counts

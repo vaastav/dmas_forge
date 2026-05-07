@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from matplotlib.ticker import PercentFormatter
 
 from .data import BenchmarkRun, write_normalized_data
 from .topology import EXAMPLES
@@ -147,6 +148,20 @@ def _performance_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any])
     _save(fig, out_dir / "performance" / "p95_latency_heatmap.png", index, "performance", "P95 latency heatmap")
 
     if not requests.empty:
+        fig = _draw_latency_cdf(
+            requests,
+            title="Request Latency CDF by Example",
+            group_col="example",
+            legend_title="Example",
+        )
+        _save(
+            fig,
+            out_dir / "performance" / "request_latency_cdf_by_example.png",
+            index,
+            "performance",
+            "Request latency CDF by example",
+        )
+
         for example, frame in requests.groupby("example", observed=True):
             fig, ax = plt.subplots(figsize=(14, 6))
             frame = frame.copy()
@@ -185,6 +200,19 @@ def _performance_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any])
                 index,
                 "performance",
                 f"{example} request latency range",
+            )
+            fig = _draw_latency_cdf(
+                frame,
+                title=f"{example}: Request Latency CDF",
+                group_col="case_axis",
+                legend_title="Spec / profile",
+            )
+            _save(
+                fig,
+                out_dir / "performance" / f"request_latency_cdf_{_slug(example)}.png",
+                index,
+                "performance",
+                f"{example} request latency CDF",
             )
 
 
@@ -511,6 +539,14 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
             )
             entry["plots"].append({"title": "Request latency range", "path": _save(fig, example_dir / "request_latency_range.png")})
 
+            fig = _draw_latency_cdf(
+                ex_requests,
+                title=f"{example}: Request Latency CDF",
+                group_col="case_axis",
+                legend_title="Spec / profile",
+            )
+            entry["plots"].append({"title": "Request latency CDF", "path": _save(fig, example_dir / "request_latency_cdf.png")})
+
         ex_components = components[components["example"].astype(str) == example] if not components.empty else pd.DataFrame()
         if not ex_components.empty:
             comp = ex_components.groupby("component", observed=True).agg(duration_ms=("duration_ms", "sum"), total_tokens=("total_tokens", "sum")).reset_index()
@@ -541,6 +577,7 @@ def _case_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any], max_ca
 
         req = requests[requests["case_name"].astype(str) == case] if not requests.empty else pd.DataFrame()
         if not req.empty:
+            req = req.copy()
             fig, ax = plt.subplots(figsize=(9, 4.8))
             sns.scatterplot(data=req, x="sequence", y="latency_ms", hue="ok", ax=ax, palette={True: "#2f855a", False: "#c53030"}, s=48)
             ax.plot(req["sequence"], req["latency_ms"], color="#a0aec0", linewidth=1, alpha=0.6)
@@ -549,6 +586,15 @@ def _case_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any], max_ca
             ax.set_ylabel("latency (ms)")
             _outside_legend(ax, "OK")
             case_entry["plots"].append(_save(fig, case_dir / "request_latency.png"))
+
+            req["outcome"] = req["ok"].map({True: "success", False: "failed"}).fillna("unknown")
+            fig = _draw_latency_cdf(
+                req,
+                title=f"{case}: Request Latency CDF",
+                group_col="outcome",
+                legend_title="Outcome",
+            )
+            case_entry["plots"].append(_save(fig, case_dir / "request_latency_cdf.png"))
 
         res = resources[resources["case_name"].astype(str) == case] if not resources.empty else pd.DataFrame()
         if not res.empty:
@@ -677,6 +723,41 @@ def _draw_latency_distribution(frame: pd.DataFrame, title: str, x_col: str) -> p
     ax.set_ylabel("latency (ms)")
     if outlier_rows:
         ax.legend(loc="upper right", frameon=False)
+    return fig
+
+
+def _draw_latency_cdf(
+    frame: pd.DataFrame,
+    title: str,
+    group_col: str | None = None,
+    legend_title: str = "Group",
+) -> plt.Figure:
+    fig, ax = plt.subplots(figsize=(14, 6))
+    groups = list(frame.groupby(group_col, observed=True, sort=False)) if group_col else [("all requests", frame)]
+    colors = sns.color_palette("tab20", n_colors=max(1, len(groups)))
+    plotted = False
+
+    for idx, (label, group) in enumerate(groups):
+        latencies = group["latency_ms"].dropna().astype(float)
+        if latencies.empty:
+            continue
+        x = np.sort(latencies.to_numpy())
+        y = np.arange(1, len(x) + 1) / len(x)
+        ax.step(x, y, where="post", linewidth=2, color=colors[idx], label=str(label))
+        plotted = True
+
+    if not plotted:
+        ax.text(0.5, 0.5, "No request latencies found", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return fig
+
+    ax.set_title(title, loc="left", pad=14)
+    ax.set_xlabel("latency (ms)")
+    ax.set_ylabel("requests <= latency")
+    ax.set_ylim(0, 1.01)
+    ax.yaxis.set_major_formatter(PercentFormatter(1.0))
+    if len(groups) > 1:
+        _outside_legend(ax, legend_title)
     return fig
 
 
