@@ -23,6 +23,13 @@
       "timeout_seconds": 900
     },
     {
+      "name": "long-light",
+      "mode": "timed",
+      "value": 1200,
+      "concurrency": 3,
+      "timeout_seconds": 900
+    },
+    {
       "name": "short-sequential",
       "mode": "timed",
       "value": 300,
