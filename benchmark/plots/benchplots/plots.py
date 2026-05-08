@@ -60,6 +60,7 @@ SPEC_COLORS = {
 OUTCOME_LABELS = {True: "success", False: "failed / timeout"}
 OUTCOME_COLORS = {"success": "#0072B2", "failed / timeout": "#D55E00"}
 PERCENTILE_LABELS = {"p50_ms": "p50", "p95_ms": "p95", "p99_ms": "p99"}
+LATENCY_FILL_ALPHA = 0.7
 METRIC_LABELS = {
     "cpu_avg_percent": "average CPU",
     "cpu_max_percent": "max CPU",
@@ -234,13 +235,7 @@ def _performance_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any])
     _save(fig, out_dir / "performance" / "p95_latency_heatmap.png", index, "performance", "P95 latency heatmap")
 
     if not requests.empty:
-        fig = _draw_latency_cdf(
-            requests,
-            title="End-to-End Request Latency CDF by Example",
-            group_col="example_display",
-            legend_title="Example",
-            legend_loc="lower right",
-        )
+        fig = _draw_request_latency_by_example(requests, "End-to-End Request Latency CDF by Example", "cdf")
         _save(
             fig,
             out_dir / "performance" / "request_latency_cdf_by_example.png",
@@ -249,61 +244,23 @@ def _performance_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any])
             "Request latency CDF by example",
         )
 
-        for example, frame in requests.groupby("example", observed=True, sort=False):
-            example_display = example_label(example)
-            fig, ax = plt.subplots(figsize=(14, 6))
-            frame = frame.copy()
-            frame, latency_label, _fmt = _scaled_latency(frame)
-            frame["outcome"] = frame["ok"].map(OUTCOME_LABELS).fillna("unknown")
-            sns.stripplot(
-                data=frame,
-                x="case_axis",
-                y="latency",
-                hue="outcome",
-                ax=ax,
-                palette=OUTCOME_COLORS,
-                dodge=True,
-                alpha=0.75,
-                size=4,
-                order=_axis_order(frame),
-            )
-            ax.set_title(f"{example_display}: End-to-End Request Latency", loc="left", pad=14)
-            ax.set_xlabel("")
-            ax.set_ylabel(latency_label)
-            ax.tick_params(axis="x", rotation=0)
-            _outside_legend(ax, "Outcome")
-            _save(
-                fig,
-                out_dir / "performance" / f"request_latency_{_slug(example)}.png",
-                index,
-                "performance",
-                f"{example_display} request latency",
-            )
-            fig = _draw_latency_distribution(
-                frame,
-                title=f"{example_display}: End-to-End Request Latency Distribution",
-                x_col="case_axis",
-            )
-            _save(
-                fig,
-                out_dir / "performance" / f"request_latency_range_{_slug(example)}.png",
-                index,
-                "performance",
-                f"{example_display} request latency range",
-            )
-            fig = _draw_latency_cdf(
-                frame,
-                title=f"{example_display}: End-to-End Request Latency CDF",
-                group_col="case_axis",
-                legend_title="Protocol",
-            )
-            _save(
-                fig,
-                out_dir / "performance" / f"request_latency_cdf_{_slug(example)}.png",
-                index,
-                "performance",
-                f"{example_display} request latency CDF",
-            )
+        fig = _draw_request_latency_by_example(requests, "End-to-End Request Latency Distribution by Example", "distribution")
+        _save(
+            fig,
+            out_dir / "performance" / "request_latency_distribution_by_example.png",
+            index,
+            "performance",
+            "Request latency distribution by example",
+        )
+
+        fig = _draw_request_latency_by_example(requests, "End-to-End Request Latency Violin Plots by Example", "violin")
+        _save(
+            fig,
+            out_dir / "performance" / "request_latency_violin_by_example.png",
+            index,
+            "performance",
+            "Request latency violin plots by example",
+        )
 
 
 def _reliability_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> None:
@@ -578,7 +535,14 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
                 title=f"{example_display}: End-to-End Request Latency Distribution",
                 x_col="case_axis",
             )
-            entry["plots"].append({"title": "Request latency range", "path": _save(fig, example_dir / "request_latency_range.png", index)})
+            entry["plots"].append({"title": "Request latency distribution", "path": _save(fig, example_dir / "request_latency_range.png", index)})
+
+            fig = _draw_latency_violin(
+                ex_requests,
+                title=f"{example_display}: End-to-End Request Latency Violin Plot",
+                x_col="case_axis",
+            )
+            entry["plots"].append({"title": "Request latency violin plot", "path": _save(fig, example_dir / "request_latency_violin.png", index)})
 
             fig = _draw_latency_cdf(
                 ex_requests,
@@ -853,8 +817,37 @@ def _draw_longest_waterfall(case: str, spans: pd.DataFrame) -> plt.Figure | None
     return fig
 
 
-def _draw_latency_distribution(frame: pd.DataFrame, title: str, x_col: str) -> plt.Figure:
-    scale, y_label, fmt = _latency_scale(frame["latency_ms"] if "latency_ms" in frame else pd.Series(dtype=float))
+def _draw_request_latency_by_example(requests: pd.DataFrame, title: str, plot_kind: str) -> plt.Figure:
+    examples = list(dict.fromkeys(requests["example"].astype(str).tolist()))
+    ncols = min(2, max(1, len(examples)))
+    nrows = int(np.ceil(len(examples) / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(15, max(5, 4.2 * nrows)), squeeze=False)
+
+    for ax, example in zip(axes.flat, examples):
+        frame = requests[requests["example"].astype(str) == example]
+        plot_title = example_label(example)
+        if plot_kind == "cdf":
+            _draw_latency_cdf(frame, title=plot_title, group_col="case_axis", legend_title="Protocol", ax=ax)
+        elif plot_kind == "distribution":
+            _draw_latency_distribution(frame, title=plot_title, x_col="case_axis", ax=ax)
+        elif plot_kind == "violin":
+            _draw_latency_violin(frame, title=plot_title, x_col="case_axis", ax=ax)
+        else:
+            raise ValueError(f"unknown latency plot kind: {plot_kind}")
+
+    for ax in axes.flat[len(examples):]:
+        ax.axis("off")
+    fig.suptitle(title, x=0.02, ha="left", fontweight="bold")
+    return fig
+
+
+def _latency_palette(labels: list[str]) -> dict[str, Any]:
+    fallback_colors = sns.color_palette("tab10", n_colors=max(1, len(labels)))
+    return {label: SPEC_COLORS.get(label.split("\n", 1)[0], fallback_colors[idx]) for idx, label in enumerate(labels)}
+
+
+def _draw_latency_distribution(frame: pd.DataFrame, title: str, x_col: str, ax: plt.Axes | None = None) -> plt.Figure:
+    scale, y_label, _fmt = _latency_scale(frame["latency_ms"] if "latency_ms" in frame else pd.Series(dtype=float))
     stats: list[dict[str, Any]] = []
     outlier_rows: list[dict[str, Any]] = []
     for case_axis, group in frame.groupby(x_col, observed=True, sort=False):
@@ -883,7 +876,10 @@ def _draw_latency_distribution(frame: pd.DataFrame, title: str, x_col: str) -> p
         for value in latencies[(latencies < whisker_low) | (latencies > whisker_high)]:
             outlier_rows.append({x_col: str(case_axis), "latency_ms": float(value)})
 
-    fig, ax = plt.subplots(figsize=(14, 6))
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(14, 6))
+    else:
+        fig = ax.figure
     if not stats:
         ax.text(0.5, 0.5, "No request latencies found", ha="center", va="center", fontsize=14)
         ax.axis("off")
@@ -892,17 +888,19 @@ def _draw_latency_distribution(frame: pd.DataFrame, title: str, x_col: str) -> p
     labels = [row[x_col] for row in stats]
     x = np.arange(len(labels))
     width = 0.42
+    palette = _latency_palette(labels)
     for i, row in enumerate(stats):
+        label = row[x_col]
         ax.vlines(i, row["whisker_low"] / scale, row["whisker_high"] / scale, color="#334155", linewidth=1.6)
         ax.add_patch(
             plt.Rectangle(
                 (i - width / 2, row["q1"] / scale),
                 width,
                 max((row["q3"] - row["q1"]) / scale, 0.0001),
-                facecolor="#63b3ed",
+                facecolor=palette.get(label, "#63b3ed"),
                 edgecolor="#1e3a8a",
                 linewidth=1.2,
-                alpha=0.9,
+                alpha=LATENCY_FILL_ALPHA,
             )
         )
         ax.hlines(row["median"] / scale, i - width / 2, i + width / 2, color="#7c2d12", linewidth=2)
@@ -920,7 +918,54 @@ def _draw_latency_distribution(frame: pd.DataFrame, title: str, x_col: str) -> p
     ax.set_xlabel("")
     ax.set_ylabel(y_label)
     if outlier_rows:
-        ax.legend(loc="upper right", frameon=False)
+        ax.legend(loc="lower right", frameon=False)
+    return fig
+
+
+def _draw_latency_violin(frame: pd.DataFrame, title: str, x_col: str, ax: plt.Axes | None = None) -> plt.Figure:
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(14, 6))
+    else:
+        fig = ax.figure
+
+    if "latency_ms" not in frame or x_col not in frame:
+        ax.text(0.5, 0.5, "No request latencies found", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return fig
+
+    plot = frame[[x_col, "latency_ms"]].dropna().copy()
+    if plot.empty:
+        ax.text(0.5, 0.5, "No request latencies found", ha="center", va="center", fontsize=14)
+        ax.axis("off")
+        return fig
+
+    scale, y_label, _fmt = _latency_scale(plot["latency_ms"])
+    plot[x_col] = plot[x_col].astype(str)
+    plot["latency"] = plot["latency_ms"].astype(float) / scale
+    order = _axis_order(plot, x_col)
+    palette = _latency_palette(order)
+    sns.violinplot(
+        data=plot,
+        x=x_col,
+        y="latency",
+        order=order,
+        hue=x_col,
+        palette=palette,
+        ax=ax,
+        inner="box",
+        cut=0,
+        dodge=False,
+        legend=False,
+        linewidth=1.2,
+    )
+    for collection in ax.collections:
+        collection.set_alpha(LATENCY_FILL_ALPHA)
+    ax.set_title(title, loc="left", pad=14)
+    ax.set_xlabel("")
+    ax.set_ylabel(y_label)
+    ax.tick_params(axis="x", rotation=35)
+    for label in ax.get_xticklabels():
+        label.set_horizontalalignment("right")
     return fig
 
 
@@ -929,9 +974,13 @@ def _draw_latency_cdf(
     title: str,
     group_col: str | None = None,
     legend_title: str = "Group",
-    legend_loc: str = "outside",
+    legend_loc: str = "lower right",
+    ax: plt.Axes | None = None,
 ) -> plt.Figure:
-    fig, ax = plt.subplots(figsize=(14, 6))
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(14, 6))
+    else:
+        fig = ax.figure
     scale, x_label, _fmt = _latency_scale(frame["latency_ms"] if "latency_ms" in frame else pd.Series(dtype=float))
     groups = list(frame.groupby(group_col, observed=True, sort=False)) if group_col else [("all requests", frame)]
     fallback_colors = sns.color_palette("tab10", n_colors=max(1, len(groups)))
