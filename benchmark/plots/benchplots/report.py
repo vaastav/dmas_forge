@@ -26,11 +26,14 @@ def write_report(data: BenchmarkRun, plot_index: dict[str, Any], out_dir: Path) 
 
 def _render(env: Environment, data: BenchmarkRun, plot_index: dict[str, Any]) -> str:
     template = env.from_string(REPORT_TEMPLATE)
-    cases = data.cases.copy()
+    cases = _with_iqr(data.cases, data.requests)
     expected = data.expected_cases.copy()
     partial = cases[cases["errors"] > 0] if not cases.empty else pd.DataFrame()
     failed = cases[(cases["requests"] > 0) & (cases["successes"] == 0)] if not cases.empty else pd.DataFrame()
     top_latency = cases.sort_values("p95_ms", ascending=False).head(10) if not cases.empty else pd.DataFrame()
+    top_latency_records = _case_records(_sort_cases(top_latency, ["example", "spec", "profile"]))
+    intra_spec_records = _records(_spec_comparisons(cases))
+    inter_example_records = _records(_example_spec_comparisons(cases))
     examples = [
         {**example, "example_label": example.get("example_label", example_label(example.get("example", "")))}
         for example in plot_index.get("examples", [])
@@ -44,12 +47,15 @@ def _render(env: Environment, data: BenchmarkRun, plot_index: dict[str, Any]) ->
         kpis=_run_kpis(cases, expected),
         partial=_sorted_case_records(partial, ["example", "spec", "profile"]),
         failed=_sorted_case_records(failed, ["example", "spec", "profile"]),
-        top_latency=_case_records(top_latency),
+        top_latency=top_latency_records,
+        top_latency_groups=_group_records(top_latency_records, "example"),
         agent_check_note=_agent_check_note(data.agent_checks),
         errors=_error_rows(data.errors),
         profiles=_profile_table(data.run_info, cases),
-        intra_spec_comparisons=_records(_spec_comparisons(cases)),
-        inter_example_comparisons=_records(_example_spec_comparisons(cases)),
+        intra_spec_comparisons=intra_spec_records,
+        intra_spec_groups=_group_records(intra_spec_records, "example"),
+        inter_example_comparisons=inter_example_records,
+        inter_example_groups=_group_records(inter_example_records, "spec"),
         examples=examples,
         generated_note="Generated from saved benchmark artifacts; benchmark/results was read-only.",
     )
@@ -65,7 +71,8 @@ def _render_example(
 ) -> str:
     template = env.from_string(EXAMPLE_TEMPLATE)
     example = example_entry["example"]
-    cases = data.cases[data.cases["example"].astype(str) == example].copy() if not data.cases.empty else pd.DataFrame()
+    all_cases = _with_iqr(data.cases, data.requests)
+    cases = all_cases[all_cases["example"].astype(str) == example].copy() if not all_cases.empty else pd.DataFrame()
     expected = data.expected_cases[data.expected_cases["example"].astype(str) == example].copy() if not data.expected_cases.empty else pd.DataFrame()
     partial = cases[cases["errors"] > 0] if not cases.empty else pd.DataFrame()
     errors = data.errors[data.errors["example"].astype(str) == example] if not data.errors.empty else pd.DataFrame()
@@ -111,6 +118,9 @@ def _render_example(
 def _template_env() -> Environment:
     env = Environment(autoescape=select_autoescape(["html"]))
     env.globals["format_cell"] = format_cell
+    env.globals["format_table_cell"] = format_table_cell
+    env.globals["column_label"] = column_label
+    env.globals["cell_class"] = cell_class
     return env
 
 
@@ -118,6 +128,7 @@ def _records(frame: pd.DataFrame) -> list[dict[str, Any]]:
     if frame.empty:
         return []
     out = frame.copy()
+    out = _with_table_fields(out)
     for col in out.columns:
         if isinstance(out[col].dtype, pd.CategoricalDtype):
             out[col] = out[col].astype(str)
@@ -129,6 +140,19 @@ def _sorted_records(frame: pd.DataFrame, columns: list[str]) -> list[dict[str, A
     if frame.empty:
         return []
     return _records(frame.sort_values(columns))
+
+
+def _group_records(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    by_title: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        raw_title = str(row.get(key) or "Unspecified")
+        title = SPEC_LABELS.get(raw_title, raw_title) if key == "spec" else raw_title
+        if title not in by_title:
+            by_title[title] = []
+            groups.append({"title": title, "rows": by_title[title]})
+        by_title[title].append(row)
+    return groups
 
 
 def _case_records(frame: pd.DataFrame) -> list[dict[str, Any]]:
@@ -152,12 +176,60 @@ def _with_display_labels(frame: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _with_table_fields(frame: pd.DataFrame) -> pd.DataFrame:
+    out = frame.copy()
+    if "spec" in out:
+        out["protocol"] = out["spec"].astype(str).map(lambda value: SPEC_LABELS.get(value, value))
+    if {"successes", "requests"}.issubset(out.columns):
+        out["request_summary"] = [
+            _request_summary(successes, requests)
+            for successes, requests in zip(out["successes"], out["requests"], strict=False)
+        ]
+    return out
+
+
+def _with_iqr(cases: pd.DataFrame, requests: pd.DataFrame) -> pd.DataFrame:
+    if cases.empty:
+        return cases.copy()
+    out = cases.copy()
+    out["iqr_ms"] = 0.0
+    if requests.empty or not {"case_name", "ok", "latency_ms"}.issubset(requests.columns):
+        return out
+    successful = requests[requests["ok"].fillna(False)].copy()
+    if successful.empty:
+        return out
+    latency = successful["latency_ms"].dropna()
+    if latency.empty:
+        return out
+    iqr = successful.groupby("case_name", observed=True)["latency_ms"].quantile(0.75).sub(
+        successful.groupby("case_name", observed=True)["latency_ms"].quantile(0.25),
+        fill_value=0.0,
+    )
+    out["iqr_ms"] = out["case_name"].map(iqr).fillna(0.0).astype(float)
+    return out
+
+
+def _request_summary(successes: Any, requests: Any) -> str:
+    return f"{_count(successes)} / {_count(requests)}"
+
+
+def _count(value: Any) -> str:
+    try:
+        return f"{float(value):,.0f}"
+    except (TypeError, ValueError):
+        return "0"
+
+
 def _sort_cases(frame: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
     out = frame.copy()
     if "example" in out:
         out["_example_order"] = out["example"].astype(str).map(lambda value: example_sort_key(value)[0])
+    if "spec" in out:
+        order = {spec: index for index, spec in enumerate(SPEC_ORDER)}
+        out["_spec_order"] = out["spec"].astype(str).map(lambda value: order.get(value, len(order)))
     sort_cols = ["_example_order" if col == "example" and "_example_order" in out else col for col in columns]
-    return out.sort_values(sort_cols).drop(columns=["_example_order"], errors="ignore")
+    sort_cols = ["_spec_order" if col == "spec" and "_spec_order" in out else col for col in sort_cols]
+    return out.sort_values(sort_cols).drop(columns=["_example_order", "_spec_order"], errors="ignore")
 
 
 def _run_kpis(cases: pd.DataFrame, expected: pd.DataFrame) -> dict[str, int | float]:
@@ -315,8 +387,6 @@ def _spec_comparisons(cases: pd.DataFrame) -> pd.DataFrame:
     for (example, profile), group in sorted_cases.groupby(["example", "profile"], observed=True, sort=False):
         if group["spec"].nunique() < 2:
             continue
-        fastest_p95 = float(group["p95_ms"].min())
-        best_throughput = float(group["throughput_rps"].max())
         for row in _sort_by_spec(group).itertuples(index=False):
             p95 = float(row.p95_ms)
             throughput = float(row.throughput_rps)
@@ -326,11 +396,12 @@ def _spec_comparisons(cases: pd.DataFrame) -> pd.DataFrame:
                     "profile": str(profile),
                     "spec": str(row.spec),
                     "requests": int(row.requests),
+                    "successes": int(row.successes),
                     "success_rate": float(row.success_rate),
+                    "p50_ms": float(row.p50_ms),
                     "p95_ms": p95,
-                    "p95_vs_fastest_ms": p95 - fastest_p95,
+                    "iqr_ms": float(getattr(row, "iqr_ms", 0.0)),
                     "throughput_rps": throughput,
-                    "throughput_vs_best_pct": ((throughput / best_throughput) - 1.0) * 100 if best_throughput else 0.0,
                 }
             )
     return pd.DataFrame(rows)
@@ -343,7 +414,6 @@ def _example_spec_comparisons(cases: pd.DataFrame) -> pd.DataFrame:
     for (spec, profile), group in cases.groupby(["spec", "profile"], observed=True, sort=True):
         if group["example"].nunique() < 2:
             continue
-        fastest_p95 = float(group["p95_ms"].min())
         sorted_group = _sort_cases(group, ["example"])
         for row in sorted_group.itertuples(index=False):
             rows.append(
@@ -352,9 +422,11 @@ def _example_spec_comparisons(cases: pd.DataFrame) -> pd.DataFrame:
                     "profile": str(profile),
                     "example": example_label(row.example),
                     "requests": int(row.requests),
+                    "successes": int(row.successes),
                     "success_rate": float(row.success_rate),
+                    "p50_ms": float(row.p50_ms),
                     "p95_ms": float(row.p95_ms),
-                    "p95_vs_fastest_ms": float(row.p95_ms) - fastest_p95,
+                    "iqr_ms": float(getattr(row, "iqr_ms", 0.0)),
                     "throughput_rps": float(row.throughput_rps),
                 }
             )
@@ -400,18 +472,31 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
   {% if rows %}
   <div class="table-wrap">
     <table>
-      <thead><tr>{% for col in columns %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+      <thead><tr>{% for col in columns %}<th>{{ column_label(col) }}</th>{% endfor %}</tr></thead>
       <tbody>
         {% for row in rows %}
         <tr>
           {% for col in columns %}
-          <td>{{ format_cell(row.get(col)) }}</td>
+          <td class="{{ cell_class(col) }}">{{ format_table_cell(col, row.get(col), row) }}</td>
           {% endfor %}
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% else %}
+  <p class="muted">No rows.</p>
+  {% endif %}
+{%- endmacro %}
+
+{% macro grouped_tables(groups, columns) -%}
+  {% if groups %}
+    {% for group in groups %}
+    <div class="table-group">
+      <h4>{{ group.title }}</h4>
+      {{ table(group.rows, columns) }}
+    </div>
+    {% endfor %}
   {% else %}
   <p class="muted">No rows.</p>
   {% endif %}
@@ -489,25 +574,27 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
       <h2>Performance</h2>
       {{ gallery(plots.get("performance", [])) }}
       <h3>Highest p95 Latency</h3>
-      {{ table(top_latency, ["case_name", "successes", "errors", "throughput_rps", "p50_ms", "p95_ms", "p99_ms"]) }}
+      <p class="table-note muted">Requests are successful / total completed requests. Completed Req/min is completed request attempts per elapsed minute. E2E latency and IQR are computed over successful requests from request dispatch to final response.</p>
+      {{ grouped_tables(top_latency_groups, ["protocol", "request_summary", "success_rate", "throughput_rps", "p50_ms", "p95_ms", "p99_ms", "iqr_ms"]) }}
     </section>
 
     <section id="spec-comparisons" class="section">
       <h2>Spec Comparisons</h2>
       <p class="subtitle">Intra-example rows compare specs within the same example and profile. Inter-example rows compare examples under the same spec and profile.</p>
+      <p class="table-note muted">Requests are successful / total completed requests. Completed Req/min is completed request attempts per elapsed minute. E2E IQR is p75 - p25 over successful end-to-end request latencies.</p>
       <h3>Intra-Example</h3>
-      {{ table(intra_spec_comparisons, ["example", "profile", "spec", "requests", "success_rate", "p95_ms", "p95_vs_fastest_ms", "throughput_rps", "throughput_vs_best_pct"]) }}
+      {{ grouped_tables(intra_spec_groups, ["profile", "spec", "request_summary", "success_rate", "throughput_rps", "p50_ms", "p95_ms", "iqr_ms"]) }}
       <h3>Inter-Example</h3>
-      {{ table(inter_example_comparisons, ["spec", "profile", "example", "requests", "success_rate", "p95_ms", "p95_vs_fastest_ms", "throughput_rps"]) }}
+      {{ grouped_tables(inter_example_groups, ["profile", "example", "request_summary", "success_rate", "throughput_rps", "p50_ms", "p95_ms", "iqr_ms"]) }}
     </section>
 
     <section id="reliability" class="section">
       <h2>Reliability</h2>
       {{ gallery(plots.get("reliability", [])) }}
       <h3>Failed Cases</h3>
-      {{ table(failed, ["case_name", "requests", "successes", "errors", "p95_ms"]) }}
+      {{ table(failed, ["case_name", "request_summary", "success_rate", "errors", "p95_ms"]) }}
       <h3>Partial Cases</h3>
-      {{ table(partial, ["case_name", "requests", "successes", "errors", "p95_ms"]) }}
+      {{ table(partial, ["case_name", "request_summary", "success_rate", "errors", "p95_ms"]) }}
     </section>
 
     <section id="agents" class="section">
@@ -581,10 +668,10 @@ EXAMPLE_TEMPLATE = """{% macro gallery(items) -%}
   {% if rows %}
   <div class="table-wrap">
     <table>
-      <thead><tr>{% for col in columns %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+      <thead><tr>{% for col in columns %}<th>{{ column_label(col) }}</th>{% endfor %}</tr></thead>
       <tbody>
         {% for row in rows %}
-        <tr>{% for col in columns %}<td>{{ format_cell(row.get(col)) }}</td>{% endfor %}</tr>
+        <tr>{% for col in columns %}<td class="{{ cell_class(col) }}">{{ format_table_cell(col, row.get(col), row) }}</td>{% endfor %}</tr>
         {% endfor %}
       </tbody>
     </table>
@@ -634,10 +721,11 @@ EXAMPLE_TEMPLATE = """{% macro gallery(items) -%}
     <section class="section">
       <h2>Cases</h2>
       <h3>Spec Comparison</h3>
-      {{ table(spec_comparisons, ["profile", "spec", "requests", "success_rate", "p95_ms", "p95_vs_fastest_ms", "throughput_rps", "throughput_vs_best_pct"]) }}
-      {{ table(cases, ["case_name", "requests", "successes", "errors", "throughput_rps", "p50_ms", "p95_ms", "p99_ms", "total_tokens"]) }}
+      <p class="table-note muted">Requests are successful / total completed requests. Completed Req/min is completed request attempts per elapsed minute. E2E latency and IQR are computed over successful requests from request dispatch to final response.</p>
+      {{ table(spec_comparisons, ["profile", "spec", "request_summary", "success_rate", "throughput_rps", "p50_ms", "p95_ms", "iqr_ms"]) }}
+      {{ table(cases, ["case_name", "request_summary", "success_rate", "throughput_rps", "p50_ms", "p95_ms", "p99_ms", "iqr_ms", "total_tokens"]) }}
       <h3>Partial or Failed Cases</h3>
-      {{ table(partial, ["case_name", "requests", "successes", "errors", "p95_ms"]) }}
+      {{ table(partial, ["case_name", "request_summary", "success_rate", "errors", "p95_ms"]) }}
       <div class="case-grid">
         {% for case in case_plots %}
         <article class="case-card">
@@ -665,6 +753,147 @@ def format_cell(value: Any) -> str:
             return f"{value:,.1f}"
         return f"{value:,.3f}".rstrip("0").rstrip(".")
     return str(value)
+
+
+COLUMN_LABELS = {
+    "case_name": "Case",
+    "category": "Error category",
+    "count": "Requests",
+    "example": "Example",
+    "profile": "Profile",
+    "protocol": "Protocol",
+    "spec": "Spec",
+    "scope": "Scope",
+    "name": "Profile",
+    "load_type": "Load",
+    "target": "Target",
+    "concurrency": "Concurrency",
+    "timeout_seconds": "Timeout (s)",
+    "cases": "Cases",
+    "request_summary": "Requests",
+    "requests": "Requests",
+    "successes": "Successful",
+    "errors": "Errors",
+    "success_rate": "Success",
+    "throughput_rps": "Completed Req/min",
+    "p50_ms": "E2E p50",
+    "p95_ms": "E2E p95",
+    "p99_ms": "E2E p99",
+    "iqr_ms": "E2E IQR",
+    "total_tokens": "Tokens",
+}
+
+SPEC_LABELS = {
+    "single": "Single",
+    "http": "HTTP",
+    "mcp": "MCP",
+    "a2a": "A2A",
+}
+
+NUMERIC_COLUMNS = {
+    "count",
+    "concurrency",
+    "timeout_seconds",
+    "cases",
+    "request_summary",
+    "requests",
+    "successes",
+    "errors",
+    "success_rate",
+    "throughput_rps",
+    "p50_ms",
+    "p95_ms",
+    "p99_ms",
+    "iqr_ms",
+    "total_tokens",
+}
+
+
+def column_label(column: str) -> str:
+    return COLUMN_LABELS.get(column, column.replace("_", " ").title())
+
+
+def cell_class(column: str) -> str:
+    classes = []
+    if column in NUMERIC_COLUMNS:
+        classes.append("num")
+    if column == "case_name":
+        classes.append("case-name")
+    return " ".join(classes)
+
+
+def format_table_cell(column: str, value: Any, row: dict[str, Any] | None = None) -> str:
+    if column == "request_summary" and not value and row:
+        return _request_summary(row.get("successes"), row.get("requests"))
+    if column == "success_rate":
+        return _format_percent(value)
+    if column in {"p50_ms", "p95_ms", "p99_ms", "iqr_ms"}:
+        return _format_latency(value)
+    if column == "throughput_rps":
+        return _format_rate(value)
+    if column == "total_tokens":
+        return _format_compact_count(value)
+    if column in {"count", "concurrency", "timeout_seconds", "cases", "requests", "successes", "errors"}:
+        return _count(value)
+    if column == "spec":
+        return SPEC_LABELS.get(str(value), format_cell(value))
+    return format_cell(value)
+
+
+def _format_percent(value: Any) -> str:
+    number = _as_float(value)
+    if number is None:
+        return ""
+    return f"{number * 100:.1f}%"
+
+
+def _format_rate(value: Any) -> str:
+    number = _as_float(value)
+    if number is None:
+        return ""
+    number *= 60.0
+    if number == 0:
+        return "0 req/min"
+    if abs(number) < 0.1:
+        return "<0.1 req/min"
+    if abs(number) < 1:
+        formatted = f"{number:.3f}".rstrip("0").rstrip(".")
+        return f"{formatted} req/min"
+    return f"{number:,.2f} req/min"
+
+
+def _format_latency(value: Any) -> str:
+    number = _as_float(value)
+    if number is None:
+        return ""
+    return _format_latency_number(number)
+
+
+def _format_latency_number(ms: float) -> str:
+    seconds = ms / 1000.0
+    return f"{seconds:,.1f} s"
+
+
+def _format_compact_count(value: Any) -> str:
+    number = _as_float(value)
+    if number is None:
+        return ""
+    if abs(number) >= 1_000_000:
+        return f"{number / 1_000_000:.1f}M"
+    if abs(number) >= 10_000:
+        return f"{number / 1_000:.1f}k"
+    return f"{number:,.0f}"
+
+
+def _as_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 REPORT_CSS = """
@@ -753,6 +982,12 @@ h3 {
   margin: 24px 0 10px;
   font-size: 17px;
 }
+h4 {
+  margin: 16px 0 8px;
+  color: #334155;
+  font-size: 14px;
+  letter-spacing: .01em;
+}
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -812,17 +1047,19 @@ figcaption {
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
+  margin: 8px 0 18px;
 }
 table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   min-width: 520px;
 }
 th, td {
   text-align: left;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-bottom: 1px solid #edf2f7;
-  vertical-align: top;
+  vertical-align: middle;
   white-space: nowrap;
 }
 th {
@@ -831,7 +1068,30 @@ th {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: .05em;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
+tbody tr:nth-child(even) { background: #fbfdff; }
+tbody tr:hover { background: #f8fafc; }
+tbody tr:last-child td { border-bottom: 0; }
+td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+td.case-name {
+  min-width: 220px;
+  white-space: normal;
+  font-weight: 650;
+  color: #1e293b;
+}
+.table-note {
+  max-width: 920px;
+  margin: -2px 0 10px;
+  font-size: 13px;
+}
+.table-group + .table-group { margin-top: 18px; }
 .case-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
