@@ -76,6 +76,35 @@
   {% endif %}
 {%- endmacro %}
 
+{% macro topology_browser(groups) -%}
+  {% if groups %}
+  <div class="case-detail-list">
+    {% for group in groups %}
+    <details id="{{ group.anchor }}" class="case-detail">
+      <summary>
+        <span class="case-title">{{ group.title }}</span>
+        <span class="case-meta">{{ group.plots|length }} topology plot{% if group.plots|length != 1 %}s{% endif %}</span>
+      </summary>
+      {% if group.plots %}
+      <div class="case-plot-grid">
+        {% for plot in group.plots %}
+        <figure>
+          <a href="{{ plot.path }}"><img src="{{ plot.path }}" alt="{{ group.title }} {{ plot.title }}"></a>
+          <figcaption>{{ plot.title }}</figcaption>
+        </figure>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted case-empty">No topology plots available for this example.</p>
+      {% endif %}
+    </details>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">No topology plots available.</p>
+  {% endif %}
+{%- endmacro %}
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -207,7 +236,7 @@
 
       <section id="topology" class="section-card">
         <h2>Topology</h2>
-        {{ gallery(plots.get("topology", [])) }}
+        {{ topology_browser(topology_groups) }}
       </section>
 
       <section id="data" class="section-card">

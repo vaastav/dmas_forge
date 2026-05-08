@@ -51,6 +51,7 @@ def _render(env: Environment, data: BenchmarkRun, plot_index: dict[str, Any]) ->
         failed=_sorted_case_records(failed, ["example", "spec", "profile"]),
         top_latency=top_latency_records,
         top_latency_groups=_group_records(top_latency_records, "example"),
+        topology_groups=_topology_groups(plot_index.get("sections", {}).get("topology", [])),
         agent_check_note=_agent_check_note(data.agent_checks),
         errors=_error_rows(data.errors),
         profiles=_profile_table(data.run_info, cases),
@@ -163,6 +164,35 @@ def _group_records(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]
     return groups
 
 
+def _topology_groups(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    by_example: dict[str, dict[str, Any]] = {}
+    for item in items:
+        plot = _plot_item(item)
+        raw_example = item.get("example") or _topology_example_from_path(plot["path"])
+        key = str(raw_example or item.get("example_label") or "topology")
+        group = by_example.get(key)
+        if group is None:
+            group = {
+                "title": str(item.get("example_label") or example_label(key)),
+                "anchor": f"topology-{_slug(key)}",
+                "plots": [],
+            }
+            by_example[key] = group
+            groups.append(group)
+        group["plots"].append(plot)
+    return groups
+
+
+def _topology_example_from_path(path: str) -> str | None:
+    stem = Path(path).stem
+    for spec in sorted(SPEC_LABELS, key=len, reverse=True):
+        suffix = f"_{_slug(spec)}"
+        if stem.endswith(suffix):
+            return stem[: -len(suffix)]
+    return None
+
+
 def _case_details(cases: pd.DataFrame, case_plots: list[dict[str, Any]]) -> list[dict[str, Any]]:
     plot_by_case = {str(case.get("case_name", "")): case for case in case_plots}
     details: list[dict[str, Any]] = []
@@ -219,6 +249,18 @@ def _plot_title(path: Any) -> str:
 def _case_anchor(case_name: str) -> str:
     slug = "".join(ch.lower() if ch.isalnum() else "-" for ch in case_name).strip("-")
     return f"case-{slug or 'detail'}"
+
+
+def _slug(value: Any) -> str:
+    safe = []
+    for ch in str(value).lower():
+        if ch.isalnum():
+            safe.append(ch)
+        elif ch in {"-", "_", "."}:
+            safe.append(ch)
+        else:
+            safe.append("-")
+    return "".join(safe).strip("-") or "item"
 
 
 def _case_records(frame: pd.DataFrame) -> list[dict[str, Any]]:

@@ -433,9 +433,16 @@ def _topology_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) ->
         meta = EXAMPLES.get(example)
         if not meta:
             continue
+        example_display = example_label(example)
         fig = draw_topology(example, spec, meta)
         path = out_dir / "topology" / f"{_slug(example)}_{_slug(spec)}.svg"
-        _save(fig, path, index, "topology", f"{example_label(example)} {spec} topology")
+        _save(fig, path, index, "topology", f"{example_display} {spec} topology")
+        index["sections"]["topology"][-1].update(
+            {
+                "example": example,
+                "example_label": example_display,
+            }
+        )
 
 
 def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> None:
