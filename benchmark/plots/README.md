@@ -108,7 +108,7 @@ examples/travel-planning/index.html
 examples/weather/index.html
 ```
 
-These pages show only charts, topology diagrams, cases, and errors for that example. They are useful when the full run report is too broad.
+These pages show only charts, case summaries, topology diagrams, and errors for that example. Case thumbnails stay collapsed until needed.
 
 ## Topology Diagrams
 

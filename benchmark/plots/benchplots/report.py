@@ -44,6 +44,7 @@ def _render(env: Environment, data: BenchmarkRun, plot_index: dict[str, Any]) ->
         run_info=data.run_info,
         plots=plot_index.get("sections", {}),
         case_plots=plot_index.get("cases", []),
+        case_details=_case_details(cases, plot_index.get("cases", [])),
         kpis=_run_kpis(cases, expected),
         partial=_sorted_case_records(partial, ["example", "spec", "profile"]),
         failed=_sorted_case_records(failed, ["example", "spec", "profile"]),
@@ -82,15 +83,15 @@ def _render_example(
         for item in plot_index.get("sections", {}).get("topology", [])
         if str(item["path"]).startswith(f"topology/{example}_")
     ]
-    case_plots = []
+    example_case_plots = []
     for case in plot_index.get("cases", []):
         if not str(case["case_name"]).startswith(example + "-"):
             continue
-        case_plots.append(
+        example_case_plots.append(
             {
                 "case_name": case["case_name"],
                 "case_label": case.get("case_label", example_case_label(case["case_name"])),
-                "plots": [_rel(out_dir / plot, page_dir) for plot in case["plots"]],
+                "plots": [_plot_item(plot, out_dir, page_dir) for plot in case["plots"]],
             }
         )
     example_plots = [
@@ -107,7 +108,8 @@ def _render_example(
         kpis=_example_kpis(cases, expected),
         plots=example_plots,
         topology=topology,
-        case_plots=case_plots,
+        case_plots=example_case_plots,
+        case_details=_case_details(cases, example_case_plots),
         cases=_sorted_case_records(cases, ["spec", "profile"]),
         spec_comparisons=_records(_spec_comparisons(cases)),
         partial=_sorted_case_records(partial, ["spec", "profile"]),
@@ -153,6 +155,64 @@ def _group_records(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]
             groups.append({"title": title, "rows": by_title[title]})
         by_title[title].append(row)
     return groups
+
+
+def _case_details(cases: pd.DataFrame, case_plots: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    plot_by_case = {str(case.get("case_name", "")): case for case in case_plots}
+    details: list[dict[str, Any]] = []
+    for row in _case_table_rows(cases):
+        case_name = str(row.get("raw_case_name", ""))
+        plot_entry = plot_by_case.get(case_name, {})
+        plots = [_plot_item(plot) for plot in plot_entry.get("plots", [])]
+        details.append(
+            {
+                **row,
+                "anchor": _case_anchor(case_name),
+                "plots": plots,
+            }
+        )
+    return details
+
+
+def _case_table_rows(cases: pd.DataFrame) -> list[dict[str, Any]]:
+    if cases.empty:
+        return []
+    rows: list[dict[str, Any]] = []
+    frame = _sort_cases(cases, ["example", "spec", "profile"])
+    for row in _records(_with_table_fields(frame)):
+        case_name = str(row.get("case_name", ""))
+        example = str(row.get("example", ""))
+        rows.append(
+            {
+                **row,
+                "raw_case_name": case_name,
+                "case_name": example_case_label(case_name),
+                "example": example_label(example),
+            }
+        )
+    return rows
+
+
+def _plot_item(plot: Any, out_dir: Path | None = None, page_dir: Path | None = None) -> dict[str, str]:
+    if isinstance(plot, dict):
+        title = str(plot.get("title") or _plot_title(plot.get("path", "")))
+        path = str(plot.get("path", ""))
+    else:
+        path = str(plot)
+        title = _plot_title(path)
+    if out_dir is not None and page_dir is not None and path:
+        path = _rel(out_dir / path, page_dir)
+    return {"title": title, "path": path}
+
+
+def _plot_title(path: Any) -> str:
+    stem = Path(str(path)).stem.replace("_", " ").replace("-", " ").strip()
+    return stem.title() if stem else "Plot"
+
+
+def _case_anchor(case_name: str) -> str:
+    slug = "".join(ch.lower() if ch.isalnum() else "-" for ch in case_name).strip("-")
+    return f"case-{slug or 'detail'}"
 
 
 def _case_records(frame: pd.DataFrame) -> list[dict[str, Any]]:
@@ -501,6 +561,37 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
   <p class="muted">No rows.</p>
   {% endif %}
 {%- endmacro %}
+
+{% macro case_browser(cases) -%}
+  {% if cases %}
+  <div class="case-browser">
+    <div class="case-detail-list">
+      {% for case in cases %}
+      <details id="{{ case.anchor }}" class="case-detail">
+        <summary>
+          <span class="case-title">{{ case.case_name }}</span>
+          <span class="case-meta">{{ case.protocol }} &middot; {{ case.profile }} &middot; {{ format_table_cell("request_summary", case.request_summary, case) }} requests &middot; {{ format_table_cell("p95_ms", case.p95_ms, case) }} p95</span>
+        </summary>
+        {% if case.plots %}
+        <div class="case-plot-grid">
+          {% for plot in case.plots %}
+          <figure>
+            <a href="{{ plot.path }}"><img src="{{ plot.path }}" alt="{{ case.case_name }} {{ plot.title }}"></a>
+            <figcaption>{{ plot.title }}</figcaption>
+          </figure>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">No plots available for this case.</p>
+        {% endif %}
+      </details>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <p class="muted">No cases.</p>
+  {% endif %}
+{%- endmacro %}
 <!doctype html>
 <html lang="en">
 <head>
@@ -519,7 +610,6 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
     </div>
     <nav>
       <a href="#overview">Overview</a>
-      <a href="#topology">Topology</a>
       <a href="#performance">Performance</a>
       <a href="#spec-comparisons">Spec Comparisons</a>
       <a href="#reliability">Reliability</a>
@@ -527,6 +617,7 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
       <a href="#resources">Resources</a>
       <a href="#spans-per-trace">Spans per Trace</a>
       <a href="#cases">Cases</a>
+      <a href="#topology">Topology</a>
     </nav>
   </header>
 
@@ -563,11 +654,6 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
         <a href="{{ example.path }}">{{ example.example_label }}</a>
         {% endfor %}
       </div>
-    </section>
-
-    <section id="topology" class="section">
-      <h2>Topology</h2>
-      {{ gallery(plots.get("topology", [])) }}
     </section>
 
     <section id="performance" class="section">
@@ -617,17 +703,13 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
 
     <section id="cases" class="section">
       <h2>Per-Case Detail</h2>
-      <p class="subtitle">Each case includes request latency, resource timelines, and a longest-trace waterfall when trace spans were available.</p>
-      <div class="case-grid">
-        {% for case in case_plots %}
-        <article class="case-card">
-          <h3>{{ case.case_label }}</h3>
-          {% for plot in case.plots %}
-          <a href="{{ plot }}"><img src="{{ plot }}" alt="{{ case.case_label }} plot"></a>
-          {% endfor %}
-        </article>
-        {% endfor %}
-      </div>
+      <p class="subtitle">Expand a case only when you need thumbnails in context.</p>
+      {{ case_browser(case_details) }}
+    </section>
+
+    <section id="topology" class="section">
+      <h2>Topology</h2>
+      {{ gallery(plots.get("topology", [])) }}
     </section>
 
     <section class="section">
@@ -680,6 +762,37 @@ EXAMPLE_TEMPLATE = """{% macro gallery(items) -%}
   <p class="muted">No rows.</p>
   {% endif %}
 {%- endmacro %}
+
+{% macro case_browser(cases) -%}
+  {% if cases %}
+  <div class="case-browser">
+    <div class="case-detail-list">
+      {% for case in cases %}
+      <details id="{{ case.anchor }}" class="case-detail">
+        <summary>
+          <span class="case-title">{{ case.case_name }}</span>
+          <span class="case-meta">{{ case.protocol }} &middot; {{ case.profile }} &middot; {{ format_table_cell("request_summary", case.request_summary, case) }} requests &middot; {{ format_table_cell("p95_ms", case.p95_ms, case) }} p95</span>
+        </summary>
+        {% if case.plots %}
+        <div class="case-plot-grid">
+          {% for plot in case.plots %}
+          <figure>
+            <a href="{{ plot.path }}"><img src="{{ plot.path }}" alt="{{ case.case_name }} {{ plot.title }}"></a>
+            <figcaption>{{ plot.title }}</figcaption>
+          </figure>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">No plots available for this case.</p>
+        {% endif %}
+      </details>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <p class="muted">No cases.</p>
+  {% endif %}
+{%- endmacro %}
 <!doctype html>
 <html lang="en">
 <head>
@@ -715,27 +828,19 @@ EXAMPLE_TEMPLATE = """{% macro gallery(items) -%}
       {{ table(errors, ["category", "count"]) }}
     </section>
     <section class="section">
-      <h2>Topology</h2>
-      {{ gallery(topology) }}
-    </section>
-    <section class="section">
       <h2>Cases</h2>
       <h3>Spec Comparison</h3>
       <p class="table-note muted">Requests are successful / total completed requests. Completed Req/min is completed request attempts per elapsed minute. E2E latency and IQR are computed over successful requests from request dispatch to final response.</p>
       {{ table(spec_comparisons, ["profile", "spec", "request_summary", "success_rate", "throughput_rps", "p50_ms", "p95_ms", "iqr_ms"]) }}
-      {{ table(cases, ["case_name", "request_summary", "success_rate", "throughput_rps", "p50_ms", "p95_ms", "p99_ms", "iqr_ms", "total_tokens"]) }}
       <h3>Partial or Failed Cases</h3>
       {{ table(partial, ["case_name", "request_summary", "success_rate", "errors", "p95_ms"]) }}
-      <div class="case-grid">
-        {% for case in case_plots %}
-        <article class="case-card">
-          <h3>{{ case.case_label }}</h3>
-          {% for plot in case.plots %}
-          <a href="{{ plot }}"><img src="{{ plot }}" alt="{{ case.case_label }} plot"></a>
-          {% endfor %}
-        </article>
-        {% endfor %}
-      </div>
+      <h3>Case Browser</h3>
+      <p class="subtitle">Expand a case to view thumbnails inline.</p>
+      {{ case_browser(case_details) }}
+    </section>
+    <section class="section">
+      <h2>Topology</h2>
+      {{ gallery(topology) }}
     </section>
   </main>
 </body>
@@ -788,6 +893,10 @@ SPEC_LABELS = {
     "http": "HTTP",
     "mcp": "MCP",
     "a2a": "A2A",
+    "memory": "Memory",
+    "no_memory": "No memory",
+    "automatic": "Automatic",
+    "agentic": "Agentic",
 }
 
 NUMERIC_COLUMNS = {
@@ -1092,29 +1201,55 @@ td.case-name {
   font-size: 13px;
 }
 .table-group + .table-group { margin-top: 18px; }
-.case-grid {
+.case-browser {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 18px;
 }
-.case-card {
+.case-detail-list {
+  display: grid;
+  gap: 10px;
+}
+.case-detail {
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 14px;
   background: #fbfdff;
+  scroll-margin-top: 16px;
 }
-.case-card h3 {
-  margin-top: 0;
-  font-size: 14px;
-  word-break: break-word;
+.case-detail summary {
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 13px 15px;
+  background: #f8fafc;
+  border-radius: 8px;
+  transition: background .15s ease, color .15s ease;
 }
-.case-card img {
-  width: 100%;
-  margin: 8px 0;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: white;
+.case-detail[open] summary {
+  background: #e6f4f1;
+  border-bottom: 1px solid var(--line);
+  border-radius: 8px 8px 0 0;
 }
+.case-detail[open] .case-title {
+  color: var(--accent);
+}
+.case-title {
+  font-weight: 800;
+  color: #1e293b;
+}
+.case-meta {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+.case-plot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+  padding: 15px;
+}
+.case-plot-grid figure { background: white; }
 .links {
   display: flex;
   gap: 10px;
@@ -1153,6 +1288,9 @@ td.case-name {
   .page-header { display: block; }
   nav { justify-content: flex-start; margin-top: 18px; }
   .gallery { grid-template-columns: 1fr; }
+  .case-detail summary { display: block; }
+  .case-meta { display: block; margin-top: 4px; text-align: left; }
+  .case-plot-grid { grid-template-columns: 1fr; }
   main { width: min(100vw - 20px, 1500px); }
 }
 """

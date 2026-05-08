@@ -784,7 +784,7 @@ def _case_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any], max_ca
             ax.set_xlabel("request sequence")
             ax.set_ylabel(latency_label)
             _outside_legend(ax, "Outcome")
-            case_entry["plots"].append(_save(fig, case_dir / "request_latency.png", index))
+            case_entry["plots"].append({"title": "Request latency", "path": _save(fig, case_dir / "request_latency.png", index)})
 
             fig = _draw_latency_cdf(
                 req,
@@ -792,7 +792,7 @@ def _case_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any], max_ca
                 group_col="outcome",
                 legend_title="Outcome",
             )
-            case_entry["plots"].append(_save(fig, case_dir / "request_latency_cdf.png", index))
+            case_entry["plots"].append({"title": "Latency CDF", "path": _save(fig, case_dir / "request_latency_cdf.png", index)})
 
         res = resources_by_case.get(case, empty)
         if not res.empty:
@@ -806,14 +806,14 @@ def _case_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any], max_ca
             axes[1].set_ylabel("MiB")
             axes[1].set_xlabel("elapsed seconds")
             _outside_legend(axes[1], "Container")
-            case_entry["plots"].append(_save(fig, case_dir / "resources.png", index))
+            case_entry["plots"].append({"title": "Resource timeline", "path": _save(fig, case_dir / "resources.png", index)})
 
         span_case = spans_by_case.get(case, empty)
         if not span_case.empty and waterfalls < max_case_waterfalls:
             fig = _draw_longest_waterfall(case, span_case)
             if fig is not None:
                 waterfalls += 1
-                case_entry["plots"].append(_save(fig, case_dir / "longest_trace_waterfall.png", index))
+                case_entry["plots"].append({"title": "Longest trace waterfall", "path": _save(fig, case_dir / "longest_trace_waterfall.png", index)})
 
         index["cases"].append(case_entry)
 
