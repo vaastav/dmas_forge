@@ -158,9 +158,10 @@ figcaption { padding: 9px 11px; color: var(--muted); border-top: 1px solid var(-
 table { width: 100%; border-collapse: separate; border-spacing: 0; }
 th, td { text-align: left; padding: 9px 11px; border-bottom: 1px solid #edf2f7; white-space: normal; }
 th { background: #f1f5f9; color: #334155; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+th + th, td + td { border-left: 1px solid #edf2f7; }
 tbody tr:nth-child(even) { background: #fbfdff; }
 tbody tr:last-child td { border-bottom: 0; }
-td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 td.case-name { min-width: 220px; white-space: normal; font-weight: 700; }
 .table-note { max-width: 920px; margin: -2px 0 10px; font-size: 13px; }
 .table-group + .table-group { margin-top: 18px; }

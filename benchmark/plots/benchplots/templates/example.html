@@ -17,7 +17,7 @@
   {% if rows %}
   <div class="table-wrap">
     <table>
-      <thead><tr>{% for col in columns %}<th>{{ column_label(col) }}</th>{% endfor %}</tr></thead>
+      <thead><tr>{% for col in columns %}<th class="{{ cell_class(col) }}">{{ column_label(col) }}</th>{% endfor %}</tr></thead>
       <tbody>
         {% for row in rows %}
         <tr>{% for col in columns %}<td class="{{ cell_class(col) }}">{{ format_table_cell(col, row.get(col), row) }}</td>{% endfor %}</tr>
