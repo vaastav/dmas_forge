@@ -8,6 +8,7 @@ import pandas as pd
 from jinja2 import Environment, select_autoescape
 
 from .data import BenchmarkRun, SPEC_ORDER
+from .labels import example_case_label, example_label, example_sort_key
 
 
 def write_report(data: BenchmarkRun, plot_index: dict[str, Any], out_dir: Path) -> None:
@@ -31,6 +32,10 @@ def _render(env: Environment, data: BenchmarkRun, plot_index: dict[str, Any]) ->
     failed = cases[(cases["requests"] > 0) & (cases["successes"] == 0)] if not cases.empty else pd.DataFrame()
     top_latency = cases.sort_values("p95_ms", ascending=False).head(10) if not cases.empty else pd.DataFrame()
     top_tokens = cases.sort_values("total_tokens", ascending=False).head(10) if not cases.empty else pd.DataFrame()
+    examples = [
+        {**example, "example_label": example.get("example_label", example_label(example.get("example", "")))}
+        for example in plot_index.get("examples", [])
+    ]
     return template.render(
         run_id=data.run_id,
         model_name=_model_name(data.run_info),
@@ -38,15 +43,15 @@ def _render(env: Environment, data: BenchmarkRun, plot_index: dict[str, Any]) ->
         plots=plot_index.get("sections", {}),
         case_plots=plot_index.get("cases", []),
         kpis=_run_kpis(cases, expected),
-        partial=_sorted_records(partial, ["example", "spec", "profile"]),
-        failed=_sorted_records(failed, ["example", "spec", "profile"]),
-        top_latency=_records(top_latency),
-        top_tokens=_records(top_tokens),
+        partial=_sorted_case_records(partial, ["example", "spec", "profile"]),
+        failed=_sorted_case_records(failed, ["example", "spec", "profile"]),
+        top_latency=_case_records(top_latency),
+        top_tokens=_case_records(top_tokens),
         errors=_error_rows(data.errors),
         profiles=_profile_table(data.run_info, cases),
         intra_spec_comparisons=_records(_spec_comparisons(cases)),
         inter_example_comparisons=_records(_example_spec_comparisons(cases)),
-        examples=plot_index.get("examples", []),
+        examples=examples,
         generated_note="Generated from saved benchmark artifacts; benchmark/results was read-only.",
     )
 
@@ -69,7 +74,7 @@ def _render_example(
     topology = [
         {"title": item["title"], "path": _rel(out_dir / item["path"], page_dir)}
         for item in plot_index.get("sections", {}).get("topology", [])
-        if item["title"].startswith(example + " ")
+        if str(item["path"]).startswith(f"topology/{example}_")
     ]
     case_plots = []
     for case in plot_index.get("cases", []):
@@ -78,6 +83,7 @@ def _render_example(
         case_plots.append(
             {
                 "case_name": case["case_name"],
+                "case_label": case.get("case_label", example_case_label(case["case_name"])),
                 "plots": [_rel(out_dir / plot, page_dir) for plot in case["plots"]],
             }
         )
@@ -89,15 +95,16 @@ def _render_example(
         run_id=data.run_id,
         model_name=_model_name(data.run_info),
         example=example,
+        example_label=example_entry.get("example_label", example_label(example)),
         root_index=_rel(out_dir / "index.html", page_dir),
         css=_rel(out_dir / "assets" / "report.css", page_dir),
         kpis=_example_kpis(cases, expected),
         plots=example_plots,
         topology=topology,
         case_plots=case_plots,
-        cases=_sorted_records(cases, ["spec", "profile"]),
+        cases=_sorted_case_records(cases, ["spec", "profile"]),
         spec_comparisons=_records(_spec_comparisons(cases)),
-        partial=_sorted_records(partial, ["spec", "profile"]),
+        partial=_sorted_case_records(partial, ["spec", "profile"]),
         errors=_error_rows(errors),
     )
 
@@ -123,6 +130,35 @@ def _sorted_records(frame: pd.DataFrame, columns: list[str]) -> list[dict[str, A
     if frame.empty:
         return []
     return _records(frame.sort_values(columns))
+
+
+def _case_records(frame: pd.DataFrame) -> list[dict[str, Any]]:
+    return _records(_with_display_labels(frame))
+
+
+def _sorted_case_records(frame: pd.DataFrame, columns: list[str]) -> list[dict[str, Any]]:
+    if frame.empty:
+        return []
+    return _case_records(_sort_cases(frame, columns))
+
+
+def _with_display_labels(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+    out = frame.copy()
+    if "example" in out:
+        out["example"] = out["example"].astype(str).map(example_label)
+    if "case_name" in out:
+        out["case_name"] = out["case_name"].astype(str).map(example_case_label)
+    return out
+
+
+def _sort_cases(frame: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    out = frame.copy()
+    if "example" in out:
+        out["_example_order"] = out["example"].astype(str).map(lambda value: example_sort_key(value)[0])
+    sort_cols = ["_example_order" if col == "example" and "_example_order" in out else col for col in columns]
+    return out.sort_values(sort_cols).drop(columns=["_example_order"], errors="ignore")
 
 
 def _run_kpis(cases: pd.DataFrame, expected: pd.DataFrame) -> dict[str, int | float]:
@@ -197,13 +233,13 @@ def _profile_table(run_info: dict[str, Any], cases: pd.DataFrame) -> list[dict[s
             profile = example_profiles.get(profile_name) or global_profiles.get(profile_name) or {"name": profile_name}
             mode = str(profile.get("mode", ""))
             value = profile.get("value", 0)
-            scope = example if profile_name in example_profiles else "default"
+            scope = example_label(example) if profile_name in example_profiles else "default"
             _add_profile_row(rows_by_key, cases, example, profile_name, scope, mode, value, profile)
     for example, profile_name in sorted((example, profile) for example, profile in used if example not in known_examples):
         profile = global_profiles.get(profile_name) or {"name": profile_name}
         mode = str(profile.get("mode", ""))
         value = profile.get("value", 0)
-        scope = "default" if profile_name in global_profiles else example
+        scope = "default" if profile_name in global_profiles else example_label(example)
         _add_profile_row(rows_by_key, cases, example, profile_name, scope, mode, value, profile)
     return list(rows_by_key.values())
 
@@ -266,7 +302,8 @@ def _spec_comparisons(cases: pd.DataFrame) -> pd.DataFrame:
     if cases.empty:
         return pd.DataFrame()
     rows: list[dict[str, Any]] = []
-    for (example, profile), group in cases.groupby(["example", "profile"], observed=True, sort=True):
+    sorted_cases = _sort_cases(cases, ["example", "profile"])
+    for (example, profile), group in sorted_cases.groupby(["example", "profile"], observed=True, sort=False):
         if group["spec"].nunique() < 2:
             continue
         fastest_p95 = float(group["p95_ms"].min())
@@ -276,7 +313,7 @@ def _spec_comparisons(cases: pd.DataFrame) -> pd.DataFrame:
             throughput = float(row.throughput_rps)
             rows.append(
                 {
-                    "example": str(example),
+                    "example": example_label(example),
                     "profile": str(profile),
                     "spec": str(row.spec),
                     "requests": int(row.requests),
@@ -298,12 +335,13 @@ def _example_spec_comparisons(cases: pd.DataFrame) -> pd.DataFrame:
         if group["example"].nunique() < 2:
             continue
         fastest_p95 = float(group["p95_ms"].min())
-        for row in group.sort_values(["example"]).itertuples(index=False):
+        sorted_group = _sort_cases(group, ["example"])
+        for row in sorted_group.itertuples(index=False):
             rows.append(
                 {
                     "spec": str(spec),
                     "profile": str(profile),
-                    "example": str(row.example),
+                    "example": example_label(row.example),
                     "requests": int(row.requests),
                     "success_rate": float(row.success_rate),
                     "p95_ms": float(row.p95_ms),
@@ -428,7 +466,7 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
       <h3>Example Views</h3>
       <div class="example-links">
         {% for example in examples %}
-        <a href="{{ example.path }}">{{ example.example }}</a>
+        <a href="{{ example.path }}">{{ example.example_label }}</a>
         {% endfor %}
       </div>
     </section>
@@ -486,9 +524,9 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
       <div class="case-grid">
         {% for case in case_plots %}
         <article class="case-card">
-          <h3>{{ case.case_name }}</h3>
+          <h3>{{ case.case_label }}</h3>
           {% for plot in case.plots %}
-          <a href="{{ plot }}"><img src="{{ plot }}" alt="{{ case.case_name }} plot"></a>
+          <a href="{{ plot }}"><img src="{{ plot }}" alt="{{ case.case_label }} plot"></a>
           {% endfor %}
         </article>
         {% endfor %}
@@ -548,14 +586,14 @@ EXAMPLE_TEMPLATE = """{% macro gallery(items) -%}
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ example }} - {{ run_id }}</title>
+  <title>{{ example_label }} - {{ run_id }}</title>
   <link rel="stylesheet" href="{{ css }}">
 </head>
 <body>
   <header class="page-header">
     <div>
       <p class="eyebrow">Example View</p>
-      <h1>{{ example }}</h1>
+      <h1>{{ example_label }}</h1>
       <p class="model-line">Model: {{ model_name }}</p>
       <p class="subtitle">Run {{ run_id }}</p>
     </div>
@@ -591,9 +629,9 @@ EXAMPLE_TEMPLATE = """{% macro gallery(items) -%}
       <div class="case-grid">
         {% for case in case_plots %}
         <article class="case-card">
-          <h3>{{ case.case_name }}</h3>
+          <h3>{{ case.case_label }}</h3>
           {% for plot in case.plots %}
-          <a href="{{ plot }}"><img src="{{ plot }}" alt="{{ case.case_name }} plot"></a>
+          <a href="{{ plot }}"><img src="{{ plot }}" alt="{{ case.case_label }} plot"></a>
           {% endfor %}
         </article>
         {% endfor %}

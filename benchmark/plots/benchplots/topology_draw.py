@@ -8,7 +8,16 @@ import networkx as nx
 import numpy as np
 from matplotlib.patches import Rectangle
 
+from .labels import example_label
 from .topology import protocol_for_spec
+
+
+SPEC_LABELS = {
+    "single": "Single-process",
+    "http": "HTTP",
+    "mcp": "MCP",
+    "a2a": "A2A",
+}
 
 
 def draw_topology(example: str, spec: str, meta: dict[str, Any]) -> plt.Figure:
@@ -20,7 +29,7 @@ def draw_topology(example: str, spec: str, meta: dict[str, Any]) -> plt.Figure:
     fig_width = 23 if len(services) >= 5 else 20
     fig_height = max(12, 1.75 * len(services) + 5)
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-    ax.set_title(f"{example} / {spec}: topology", loc="left", fontsize=17, pad=16, weight="bold")
+    ax.set_title(f"{example_label(example)}: {SPEC_LABELS.get(spec, spec.upper())} topology", loc="left", fontsize=17, pad=16, weight="bold")
     ax.axis("off")
 
     _draw_container_boxes(ax, graph, pos)
