@@ -117,7 +117,7 @@
   <div class="report-shell">
     <aside class="sidebar">
       <h1>Benchmark Report</h1>
-      <p>Run {{ run_id }}</p>
+      <p>{{ run_meta.started_short }}</p>
       <p>{{ model_name }}</p>
       <nav class="side-nav" aria-label="Report sections">
         <a href="#overview">Overview</a>
@@ -143,33 +143,52 @@
 
     <main class="content">
       <header class="page-header">
-        <h1>Run {{ run_id }}</h1>
-        <p>{{ generated_note }}</p>
+        <h1>{{ run_meta.started }}</h1>
+        <p>Run <code>{{ run_id }}</code> · {{ run_meta.mode }}</p>
+        <div class="meta-grid">
+          <div><label>LLM</label><span>{{ model_name }}</span></div>
+          {% if run_meta.model_url %}
+          <div><label>Provider URL</label><code>{{ run_meta.model_url }}</code></div>
+          {% endif %}
+          {% if run_meta.embedding_model %}
+          <div><label>Embedding</label><span>{{ run_meta.embedding_model }}</span></div>
+          {% endif %}
+        </div>
       </header>
 
       <section id="overview" class="section-card">
-        <h2>Overview</h2>
+        <h2>Experimental Setup</h2>
+        <p class="muted">{{ generated_note }}</p>
         <div class="kpi-grid">
           <div><span>{{ kpis.cases }}</span><label>present cases</label></div>
           <div><span>{{ kpis.expected }}</span><label>comparison cells</label></div>
-          <div><span>{{ kpis.requests }}</span><label>requests</label></div>
-          <div><span>{{ kpis.successes }}</span><label>successes</label></div>
-          <div><span>{{ kpis.failures }}</span><label>failures</label></div>
-          <div><span>{{ "%.1f%%"|format(kpis.avg_success_rate * 100) }}</span><label>success rate</label></div>
-          <div><span>{{ "{:,}".format(kpis.tokens) }}</span><label>tokens</label></div>
-          <div><span>{{ format_table_cell("p95_ms", kpis.max_p95) }}</span><label>max p95</label></div>
+          <div><span>{{ kpis.examples }}</span><label>examples</label></div>
+          <div><span>{{ kpis.specs }}</span><label>protocols</label></div>
+          <div><span>{{ kpis.profiles }}</span><label>profiles</label></div>
         </div>
-        {{ gallery(plots.get("overview", [])) }}
+
+        <h3>Profiles</h3>
+        <p class="muted">Profiles define the load applied to the benchmark cases.</p>
+        {{ table(profiles, ["scope", "name", "load_type", "target", "concurrency", "timeout_seconds", "cases"]) }}
+
+        <h3>Run Summary</h3>
+        <div class="kpi-grid">
+          <div><span>{{ "%.1f%%"|format(kpis.avg_success_rate * 100) }}</span><label>success rate</label></div>
+          <div><span>{{ "{:,}".format(kpis.requests) }}</span><label>requests</label></div>
+          <div><span>{{ "{:,}".format(kpis.successes) }}</span><label>successes</label></div>
+          <div><span>{{ "{:,}".format(kpis.failures) }}</span><label>failures</label></div>
+          <div><span>{{ "{:,}".format(kpis.tokens) }}</span><label>tokens</label></div>
+          <div><span>{{ format_table_cell("p95_ms", kpis.max_p95) }}</span><label>worst p95</label></div>
+        </div>
 
         <div class="split-grid">
           <div>
-            <h3>Profiles</h3>
-            <p class="muted">Fixed request count profiles stop after the target request count; timed duration profiles keep issuing requests until the target duration elapses.</p>
-            {{ table(profiles, ["scope", "name", "load_type", "target", "concurrency", "timeout_seconds", "cases"]) }}
-          </div>
-          <div>
             <h3>Error Categories</h3>
             {{ table(errors, ["category", "count"]) }}
+          </div>
+          <div>
+            <h3>Success Heatmap</h3>
+            {{ gallery(plots.get("overview", [])) }}
           </div>
         </div>
       </section>

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 import os
@@ -42,6 +43,7 @@ def _render(env: Environment, data: BenchmarkRun, plot_index: dict[str, Any]) ->
     return template.render(
         run_id=data.run_id,
         model_name=_model_name(data.run_info),
+        run_meta=_run_meta(data.run_info),
         run_info=data.run_info,
         plots=plot_index.get("sections", {}),
         case_plots=plot_index.get("cases", []),
@@ -346,6 +348,9 @@ def _run_kpis(cases: pd.DataFrame, expected: pd.DataFrame) -> dict[str, int | fl
     return {
         "cases": int(len(cases)),
         "expected": int(len(expected)) if not expected.empty else int(len(cases)),
+        "examples": int(cases["example"].nunique()) if not cases.empty and "example" in cases else 0,
+        "specs": int(cases["spec"].nunique()) if not cases.empty and "spec" in cases else 0,
+        "profiles": int(cases["profile"].nunique()) if not cases.empty and "profile" in cases else 0,
         "requests": int(requests),
         "successes": int(successes),
         "failures": int(cases["errors"].sum()) if not cases.empty else 0,
@@ -369,11 +374,11 @@ def _example_kpis(cases: pd.DataFrame, expected: pd.DataFrame) -> dict[str, int 
     }
 
 
-def _error_rows(errors: pd.DataFrame) -> list[dict[str, int | str]]:
+def _error_rows(errors: pd.DataFrame) -> list[dict[str, Any]]:
     if errors.empty:
         return []
     counts = errors.groupby("error_category", observed=True)["count"].sum().sort_values(ascending=False)
-    return [{"category": k, "count": int(v)} for k, v in counts.items()]
+    return [{"category": _error_label(k), "count": int(v)} for k, v in counts.items()]
 
 
 def _agent_check_note(agent_checks: pd.DataFrame) -> str:
@@ -473,18 +478,27 @@ def _add_profile_row(
 
 def _load_type(mode: str) -> str:
     if mode == "timed":
-        return "timed duration"
+        return "Timed duration"
     if mode == "requests":
-        return "fixed request count"
+        return "Fixed request count"
     return mode or "unknown"
 
 
 def _load_target(mode: str, value: Any) -> str:
     if mode == "timed":
-        return f"{format_cell(value)} seconds"
+        return _duration_label(value)
     if mode == "requests":
         return f"{format_cell(value)} requests"
     return format_cell(value)
+
+
+def _duration_label(value: Any) -> str:
+    seconds = _as_float(value)
+    if seconds is None:
+        return ""
+    if seconds >= 60 and seconds % 60 == 0:
+        return f"{int(seconds // 60)} min"
+    return f"{format_cell(seconds)} seconds"
 
 
 def _spec_comparisons(cases: pd.DataFrame) -> pd.DataFrame:
@@ -561,6 +575,45 @@ def _model_name(run_info: dict[str, Any]) -> str:
     return "unknown"
 
 
+def _run_meta(run_info: dict[str, Any]) -> dict[str, str]:
+    model = run_info.get("model")
+    out = {
+        "started": _format_started(run_info.get("started")),
+        "started_short": _format_started(run_info.get("started"), short=True),
+        "model_url": "",
+        "embedding_model": "",
+        "mode": "Run mode unknown",
+    }
+    if isinstance(model, dict):
+        out["model_url"] = str(model.get("url") or "")
+        out["embedding_model"] = str(model.get("embedding_model") or "")
+    cfg = run_info.get("config", {}) if isinstance(run_info.get("config"), dict) else {}
+    mock = run_info.get("mock", cfg.get("mock"))
+    if mock is True:
+        out["mode"] = "Mock run"
+    elif mock is False:
+        out["mode"] = "Live run"
+    return out
+
+
+def _format_started(value: Any, short: bool = False) -> str:
+    if not value:
+        return "Date unavailable" if short else "Run date unavailable"
+    text = str(value)
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return "Date unavailable" if short else "Run date unavailable"
+    if short:
+        return f"{dt:%b} {dt.day}, {dt.year}"
+    time = dt.strftime("%I:%M %p").lstrip("0")
+    offset = dt.strftime("%z")
+    zone = f" UTC{offset[:3]}:{offset[3:]}" if offset else ""
+    return f"{dt:%B} {dt.day}, {dt.year} at {time}{zone}"
+
+
 def format_cell(value: Any) -> str:
     if value is None:
         return ""
@@ -612,6 +665,18 @@ SPEC_LABELS = {
     "agentic": "Agentic",
 }
 
+ERROR_LABELS = {
+    "server_5xx": "Server error / timeout",
+    "other_error": "Other error",
+    "rate_limit_429": "Rate limit",
+    "http_500": "HTTP 500",
+    "transport_500": "Transport 500",
+    "workflow_no_report": "No workflow report",
+    "a2a_error": "A2A error",
+    "mcp_error": "MCP error",
+    "llm_error": "LLM error",
+}
+
 NUMERIC_COLUMNS = {
     "count",
     "concurrency",
@@ -633,6 +698,11 @@ NUMERIC_COLUMNS = {
 
 def column_label(column: str) -> str:
     return COLUMN_LABELS.get(column, column.replace("_", " ").title())
+
+
+def _error_label(value: Any) -> str:
+    text = str(value)
+    return ERROR_LABELS.get(text, text.replace("_", " ").title())
 
 
 def cell_class(column: str) -> str:
