@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -443,10 +444,11 @@ def _short_container(name: str) -> str:
     for suffix in ("_ctr-1", "-1"):
         if text.endswith(suffix):
             text = text[: -len(suffix)]
-    parts = text.split("-")
-    if len(parts) > 5:
-        return "-".join(parts[-2:])
-    return text
+            break
+    match = re.match(r"^.*-[0-9a-f]{8}-(.+)$", text)
+    if match:
+        text = match.group(1)
+    return text.replace("_", " ").title()
 
 
 def _json_records(frame: pd.DataFrame) -> list[dict[str, Any]]:

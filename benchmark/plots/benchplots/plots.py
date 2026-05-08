@@ -483,6 +483,10 @@ def _resource_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) ->
     if not resources.empty:
         top_cases = cases.sort_values("memory_max_bytes", ascending=False).head(12)["case_name"].tolist()
         plot = resources[resources["case_name"].isin(top_cases)].copy()
+        plot = plot.groupby(["case_name", "elapsed_s"], observed=True, as_index=False).agg(
+            cpu_percent=("cpu_percent", "sum"),
+            memory_bytes=("memory_bytes", "sum"),
+        )
         plot["memory_mib"] = plot["memory_bytes"] / 1024 / 1024
         plot["case_label"] = plot["case_name"].map(_short_case_label)
         fig, axes = plt.subplots(2, 1, figsize=(14, 8), sharex=True)
