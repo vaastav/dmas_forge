@@ -28,6 +28,8 @@ class BenchmarkRun:
     traces: pd.DataFrame
     errors: pd.DataFrame
     components: pd.DataFrame
+    agent_metrics: pd.DataFrame
+    agent_checks: pd.DataFrame
     topologies: pd.DataFrame
 
 
@@ -43,6 +45,7 @@ def load_run(results_root: Path, run_id: str) -> BenchmarkRun:
     span_rows: list[dict[str, Any]] = []
     trace_rows: list[dict[str, Any]] = []
     component_rows: list[dict[str, Any]] = []
+    agent_rows: list[dict[str, Any]] = []
 
     for case_dir in sorted(p for p in run_dir.iterdir() if p.is_dir()):
         summary = _read_json(case_dir / "summary.json", None)
@@ -139,6 +142,7 @@ def load_run(results_root: Path, run_id: str) -> BenchmarkRun:
                     "input_tokens": _num(tags.get("llm.input_tokens")),
                     "output_tokens": _num(tags.get("llm.output_tokens")),
                     "total_tokens": _num(tags.get("llm.total_tokens")),
+                    "parent_span_id": row.get("parent_span_id", ""),
                 }
             )
         trace_payload = _read_json(case_dir / "traces.json", {})
@@ -156,6 +160,7 @@ def load_run(results_root: Path, run_id: str) -> BenchmarkRun:
                     "warnings": len(trace.get("warnings", []) or []),
                 }
             )
+        agent_rows.extend(_agent_metric_rows(case_base, trace_payload))
 
     cases = _order_cases(pd.DataFrame(case_rows))
     expected_cases = _expected_cases(run_info, cases)
@@ -164,7 +169,9 @@ def load_run(results_root: Path, run_id: str) -> BenchmarkRun:
     spans = _prepare_spans(_order_cases(pd.DataFrame(span_rows)))
     traces = _order_cases(pd.DataFrame(trace_rows))
     components = _order_cases(pd.DataFrame(component_rows))
+    agent_metrics = _order_cases(pd.DataFrame(agent_rows))
     errors = _build_errors(requests)
+    agent_checks = _build_agent_checks(cases, agent_metrics)
     topologies = build_topology_rows(expected_cases if not expected_cases.empty else cases)
 
     return BenchmarkRun(
@@ -179,6 +186,8 @@ def load_run(results_root: Path, run_id: str) -> BenchmarkRun:
         traces=traces,
         errors=errors,
         components=components,
+        agent_metrics=agent_metrics,
+        agent_checks=agent_checks,
         topologies=topologies,
     )
 
@@ -195,6 +204,8 @@ def write_normalized_data(data: BenchmarkRun, out_dir: Path) -> None:
         "traces": data.traces,
         "errors": data.errors,
         "components": data.components,
+        "agent_metrics": data.agent_metrics,
+        "agent_checks": data.agent_checks,
         "topologies": data.topologies,
     }
     normalized: dict[str, Any] = {
@@ -423,6 +434,130 @@ def _prepare_spans(frame: pd.DataFrame) -> pd.DataFrame:
     frame["trace_start_ms"] = frame.groupby(["case_name", "trace_id"], observed=False)["start_ms"].transform("min")
     frame["relative_start_ms"] = frame["start_ms"] - frame["trace_start_ms"]
     return frame
+
+
+def _agent_metric_rows(case_base: dict[str, Any], trace_payload: Any) -> list[dict[str, Any]]:
+    if not isinstance(trace_payload, dict):
+        return []
+    rows: dict[str, dict[str, Any]] = {}
+    for trace in trace_payload.get("data", []) or []:
+        if not isinstance(trace, dict):
+            continue
+        spans = [span for span in trace.get("spans", []) or [] if isinstance(span, dict)]
+        spans_by_id = {str(span.get("spanID", "")): span for span in spans if span.get("spanID")}
+        for span in spans:
+            operation = str(span.get("operationName", "") or "")
+            agent = _agent_name_from_operation(operation)
+            if agent and "Server_" in operation:
+                row = _ensure_agent_metric_row(rows, case_base, agent)
+                row["agent_spans"] += 1
+                row["duration_ms"] += _num(span.get("duration")) / 1000.0
+            if operation == "llm.call":
+                agent = _nearest_parent_agent(span, spans_by_id) or "Unattributed"
+                tags = _trace_span_tags(span)
+                row = _ensure_agent_metric_row(rows, case_base, agent)
+                row["llm_calls"] += 1
+                row["input_tokens"] += _num(tags.get("llm.input_tokens"))
+                row["output_tokens"] += _num(tags.get("llm.output_tokens"))
+                row["total_tokens"] += _num(tags.get("llm.total_tokens"))
+    return sorted(rows.values(), key=lambda row: (row["agent"] == "Unattributed", str(row["agent"])))
+
+
+def _ensure_agent_metric_row(rows: dict[str, dict[str, Any]], case_base: dict[str, Any], agent: str) -> dict[str, Any]:
+    row = rows.get(agent)
+    if row is None:
+        row = {
+            **case_base,
+            "agent": agent,
+            "agent_spans": 0,
+            "duration_ms": 0.0,
+            "llm_calls": 0,
+            "input_tokens": 0.0,
+            "output_tokens": 0.0,
+            "total_tokens": 0.0,
+        }
+        rows[agent] = row
+    return row
+
+
+def _nearest_parent_agent(span: dict[str, Any], spans_by_id: dict[str, dict[str, Any]]) -> str:
+    seen: set[str] = set()
+    parent = _parent_span_id(span)
+    while parent and parent not in seen:
+        seen.add(parent)
+        current = spans_by_id.get(parent)
+        if not current:
+            break
+        operation = str(current.get("operationName", "") or "")
+        agent = _agent_name_from_operation(operation)
+        if agent:
+            return agent
+        parent = _parent_span_id(current)
+    return ""
+
+
+def _agent_name_from_operation(operation: str) -> str:
+    if _is_internal_operation(operation):
+        return ""
+    match = re.match(r"^(.+?(?:Agent|Coordinator|Controller))(?:Client|Server)?_", operation)
+    return match.group(1) if match else ""
+
+
+def _is_internal_operation(operation: str) -> bool:
+    return operation.startswith(("llm.", "mcp.", "tool.", "rag.", "kb.", "embedding."))
+
+
+def _parent_span_id(span: dict[str, Any]) -> str:
+    for ref in span.get("references", []) or []:
+        if isinstance(ref, dict) and ref.get("refType") == "CHILD_OF":
+            return str(ref.get("spanID", "") or "")
+    return ""
+
+
+def _trace_span_tags(span: dict[str, Any]) -> dict[str, Any]:
+    tags: dict[str, Any] = {}
+    for raw in span.get("tags", []) or []:
+        if not isinstance(raw, dict):
+            continue
+        key = str(raw.get("key", "") or "")
+        if key:
+            tags[key] = raw.get("value")
+    return tags
+
+
+def _build_agent_checks(cases: pd.DataFrame, agent_metrics: pd.DataFrame) -> pd.DataFrame:
+    columns = [
+        "case_name",
+        "example",
+        "spec",
+        "profile",
+        "case_total_tokens",
+        "accounted_tokens",
+        "unattributed_tokens",
+        "token_delta",
+        "attribution_ok",
+    ]
+    if cases.empty:
+        return pd.DataFrame(columns=columns)
+    checks = cases[["case_name", "example", "spec", "profile", "total_tokens"]].copy()
+    checks = checks.rename(columns={"total_tokens": "case_total_tokens"})
+    if agent_metrics.empty:
+        checks["accounted_tokens"] = 0.0
+        checks["unattributed_tokens"] = 0.0
+    else:
+        totals = agent_metrics.groupby("case_name", observed=True)["total_tokens"].sum().reset_index(name="accounted_tokens")
+        unattributed = (
+            agent_metrics[agent_metrics["agent"].astype(str) == "Unattributed"]
+            .groupby("case_name", observed=True)["total_tokens"]
+            .sum()
+            .reset_index(name="unattributed_tokens")
+        )
+        checks = checks.merge(totals, on="case_name", how="left")
+        checks = checks.merge(unattributed, on="case_name", how="left")
+        checks[["accounted_tokens", "unattributed_tokens"]] = checks[["accounted_tokens", "unattributed_tokens"]].fillna(0.0)
+    checks["token_delta"] = checks["case_total_tokens"] - checks["accounted_tokens"]
+    checks["attribution_ok"] = (checks["token_delta"].abs() < 0.5) & (checks["unattributed_tokens"].abs() < 0.5)
+    return _order_cases(checks[columns])
 
 
 def _build_errors(requests: pd.DataFrame) -> pd.DataFrame:

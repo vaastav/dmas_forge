@@ -31,7 +31,6 @@ def _render(env: Environment, data: BenchmarkRun, plot_index: dict[str, Any]) ->
     partial = cases[cases["errors"] > 0] if not cases.empty else pd.DataFrame()
     failed = cases[(cases["requests"] > 0) & (cases["successes"] == 0)] if not cases.empty else pd.DataFrame()
     top_latency = cases.sort_values("p95_ms", ascending=False).head(10) if not cases.empty else pd.DataFrame()
-    top_tokens = cases.sort_values("total_tokens", ascending=False).head(10) if not cases.empty else pd.DataFrame()
     examples = [
         {**example, "example_label": example.get("example_label", example_label(example.get("example", "")))}
         for example in plot_index.get("examples", [])
@@ -46,7 +45,7 @@ def _render(env: Environment, data: BenchmarkRun, plot_index: dict[str, Any]) ->
         partial=_sorted_case_records(partial, ["example", "spec", "profile"]),
         failed=_sorted_case_records(failed, ["example", "spec", "profile"]),
         top_latency=_case_records(top_latency),
-        top_tokens=_case_records(top_tokens),
+        agent_check_note=_agent_check_note(data.agent_checks),
         errors=_error_rows(data.errors),
         profiles=_profile_table(data.run_info, cases),
         intra_spec_comparisons=_records(_spec_comparisons(cases)),
@@ -195,6 +194,16 @@ def _error_rows(errors: pd.DataFrame) -> list[dict[str, int | str]]:
         return []
     counts = errors.groupby("error_category", observed=True)["count"].sum().sort_values(ascending=False)
     return [{"category": k, "count": int(v)} for k, v in counts.items()]
+
+
+def _agent_check_note(agent_checks: pd.DataFrame) -> str:
+    if agent_checks.empty or "attribution_ok" not in agent_checks:
+        return "Token check: no agent token check was available."
+    failed = agent_checks[~agent_checks["attribution_ok"].fillna(False)]
+    if failed.empty:
+        return "Token check: all plotted agent tokens match the case totals."
+    count = len(failed)
+    return f"Token check: {count} case{'s' if count != 1 else ''} need review; see data/agent_checks.csv."
 
 
 def _rel(target: Path, start: Path) -> str:
@@ -429,9 +438,9 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
       <a href="#performance">Performance</a>
       <a href="#spec-comparisons">Spec Comparisons</a>
       <a href="#reliability">Reliability</a>
-      <a href="#tokens">Tokens</a>
+      <a href="#agents">Agent Metrics</a>
       <a href="#resources">Resources</a>
-      <a href="#traces">Traces</a>
+      <a href="#spans-per-trace">Spans per Trace</a>
       <a href="#cases">Cases</a>
     </nav>
   </header>
@@ -501,11 +510,11 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
       {{ table(partial, ["case_name", "requests", "successes", "errors", "p95_ms"]) }}
     </section>
 
-    <section id="tokens" class="section">
-      <h2>Tokens and Components</h2>
-      {{ gallery(plots.get("tokens", [])) }}
-      <h3>Highest Token Cases</h3>
-      {{ table(top_tokens, ["case_name", "successes", "errors", "input_tokens", "output_tokens", "total_tokens", "tokens_per_success"]) }}
+    <section id="agents" class="section">
+      <h2>Agent Metrics</h2>
+      <p class="subtitle">Per-example charts show average agent seconds per request and average LLM token use per successful request.</p>
+      {{ gallery(plots.get("agents", [])) }}
+      <p class="footnote muted">{{ agent_check_note }}</p>
     </section>
 
     <section id="resources" class="section">
@@ -513,14 +522,15 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
       {{ gallery(plots.get("resources", [])) }}
     </section>
 
-    <section id="traces" class="section">
-      <h2>Traces</h2>
-      {{ gallery(plots.get("traces", [])) }}
+    <section id="spans-per-trace" class="section">
+      <h2>Spans per Trace</h2>
+      <p class="subtitle">Each example gets separate span-count distribution and protocol summary charts so protocol variance is visible without mixing unrelated workflows.</p>
+      {{ gallery(plots.get("spans_per_trace", [])) }}
     </section>
 
     <section id="cases" class="section">
       <h2>Per-Case Detail</h2>
-      <p class="subtitle">Each case includes request latency, resource timelines, component duration, and a longest-trace waterfall when trace spans were available.</p>
+      <p class="subtitle">Each case includes request latency, resource timelines, and a longest-trace waterfall when trace spans were available.</p>
       <div class="case-grid">
         {% for case in case_plots %}
         <article class="case-card">
@@ -542,6 +552,8 @@ REPORT_TEMPLATE = """{% macro gallery(items) -%}
         <a href="data/resources.csv">resources.csv</a>
         <a href="data/spans.csv">spans.csv</a>
         <a href="data/traces.csv">traces.csv</a>
+        <a href="data/agent_metrics.csv">agent_metrics.csv</a>
+        <a href="data/agent_checks.csv">agent_checks.csv</a>
       </div>
     </section>
   </main>
@@ -868,6 +880,12 @@ th {
   color: var(--accent);
   border-color: var(--line);
   background: #fbfdff;
+}
+.footnote {
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  margin: 12px 0 0;
+  padding-top: 10px;
 }
 .muted { color: var(--muted); }
 

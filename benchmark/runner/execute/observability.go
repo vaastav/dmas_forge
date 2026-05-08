@@ -103,6 +103,8 @@ func flattenSpans(traces []map[string]any) []map[string]any {
 			rows = append(rows, map[string]any{
 				"trace_id":       traceID,
 				"span_id":        span["spanID"],
+				"parent_span_id": parentSpanID(span),
+				"references":     span["references"],
 				"operation_name": span["operationName"],
 				"service_name":   processes[processID],
 				"start_time":     span["startTime"],
@@ -112,6 +114,22 @@ func flattenSpans(traces []map[string]any) []map[string]any {
 		}
 	}
 	return rows
+}
+
+func parentSpanID(span map[string]any) string {
+	for _, raw := range asSlice(span["references"]) {
+		ref, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		refType, _ := ref["refType"].(string)
+		if refType != "CHILD_OF" {
+			continue
+		}
+		spanID, _ := ref["spanID"].(string)
+		return spanID
+	}
+	return ""
 }
 
 func tagsMap(span map[string]any) map[string]any {

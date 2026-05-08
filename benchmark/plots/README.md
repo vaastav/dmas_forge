@@ -4,7 +4,7 @@ Python report generator for saved DMAS Forge benchmark runs.
 
 It answers a follow-up question:
 
-> After a benchmark run finishes, what happened across examples, specs, profiles, traces, resources, and components?
+> After a benchmark run finishes, what happened across examples, specs, profiles, agents, traces, and resources?
 
 The plot generator reads saved benchmark artifacts from `benchmark/results/`, normalizes them into reusable data files, then writes a static HTML report with charts, topology diagrams, and per-example drilldowns.
 
@@ -13,10 +13,9 @@ The plot generator reads saved benchmark artifacts from `benchmark/results/`, no
 - Request success, partial failures, and failed cases
 - Latency: per-request points, CDFs, plus p50, p95, and p99 comparisons
 - Throughput by example, spec, and profile
-- LLM token usage by case and component
-- Component duration and span counts
+- Average agent time and LLM input/output token use by example and protocol
 - Docker CPU and memory timelines
-- Trace coverage, span distributions, and operation/service heatmaps
+- Spans per trace distributions with per-protocol averages, medians, and IQRs
 - Longest-trace waterfall charts for each case
 - Example/spec topology diagrams with HTTP, MCP, A2A, LLM, tool, and OpenTelemetry edges
 
@@ -38,9 +37,9 @@ data/*.csv                  CSV exports for cases, requests, spans, traces, etc.
 overview/                   Run-level summary charts
 performance/                Throughput and latency comparisons
 reliability/                Success/error and error taxonomy charts
-tokens/                     Token and component charts
+agents/                     Per-example agent time and token charts
 resources/                  CPU and memory charts
-traces/                     Trace coverage and span charts
+spans_per_trace/            Per-example spans-per-trace charts
 topology/                   Example/spec topology SVGs
 examples/<example>/         Per-example report pages
 cases/<case>/               Per-case charts
@@ -90,7 +89,7 @@ The default paths are relative to this folder:
 1. Loads `run.json` for the selected run.
 2. Finds each case folder under `benchmark/results/<run-id>/`.
 3. Reads `summary.json`, `requests.jsonl`, `resources.jsonl`, `spans.jsonl`, and `traces.json`.
-4. Normalizes the raw files into tables for cases, requests, resources, spans, traces, errors, components, and topologies.
+4. Normalizes the raw files into tables for cases, requests, resources, spans, traces, errors, components, agent metrics, attribution checks, and topologies.
 5. Writes JSON and CSV data exports.
 6. Generates Matplotlib and Seaborn charts.
 7. Generates NetworkX topology diagrams.

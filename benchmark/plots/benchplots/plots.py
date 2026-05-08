@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from pathlib import Path
+import re
 from typing import Any
 
 import matplotlib
@@ -12,6 +13,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from matplotlib.ticker import FuncFormatter, PercentFormatter
 
 from .data import BenchmarkRun, write_normalized_data
@@ -23,9 +26,9 @@ PLOT_DIRS = [
     "overview",
     "performance",
     "reliability",
-    "tokens",
+    "agents",
     "resources",
-    "traces",
+    "spans_per_trace",
     "topology",
     "examples",
     "cases",
@@ -87,9 +90,7 @@ def generate_plots(data: BenchmarkRun, out_dir: Path, max_case_waterfalls: int =
     _overview_plots(data, out_dir, index)
     _performance_plots(data, out_dir, index)
     _reliability_plots(data, out_dir, index)
-    _token_plots(data, out_dir, index)
     _resource_plots(data, out_dir, index)
-    _trace_plots(data, out_dir, index)
     _topology_plots(data, out_dir, index)
     _example_plots(data, out_dir, index)
     _case_plots(data, out_dir, index, max_case_waterfalls)
@@ -360,86 +361,6 @@ def _reliability_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any])
         _save(fig, out_dir / "reliability" / "failures_by_spec.png", index, "reliability", "Failures by spec")
 
 
-def _token_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> None:
-    cases = _with_display_columns(_actual(data.cases))
-    if cases.empty:
-        return
-    token_cases = cases.sort_values("total_tokens", ascending=False).copy()
-    fig, ax = plt.subplots(figsize=(15, max(7, len(token_cases) * 0.22)))
-    y = np.arange(len(token_cases))
-    ax.barh(y, token_cases["input_tokens"], color="#3182ce", label="input")
-    ax.barh(y, token_cases["output_tokens"], left=token_cases["input_tokens"], color="#805ad5", label="output")
-    ax.set_yticks(y)
-    ax.set_yticklabels(token_cases["case_name"].map(_short_case_label), fontsize=8)
-    ax.invert_yaxis()
-    ax.set_title("Input and Output Tokens by Case", loc="left", pad=14)
-    ax.set_xlabel("tokens (K)")
-    _format_count_axis(ax, 1_000, "K")
-    ax.legend(loc="lower right", frameon=False)
-    _save(fig, out_dir / "tokens" / "tokens_by_case.png", index, "tokens", "Tokens by case")
-
-    fig, ax = plt.subplots(figsize=(13, 6))
-    plot = cases[cases["tokens_per_success"] > 0].copy()
-    plot["tokens_per_success_k"] = plot["tokens_per_success"] / 1_000
-    sns.barplot(
-        data=plot,
-        x="example_display",
-        y="tokens_per_success_k",
-        hue="spec_display",
-        hue_order=_spec_hue_order(plot),
-        ax=ax,
-        palette=_spec_palette(plot),
-        errorbar=None,
-        order=_example_axis_order(plot),
-    )
-    ax.set_title("Tokens per Successful Request", loc="left", pad=14)
-    ax.set_xlabel("")
-    ax.set_ylabel("K tokens / successful request")
-    ax.tick_params(axis="x", rotation=15)
-    _outside_legend(ax, "Protocol")
-    _save(fig, out_dir / "tokens" / "tokens_per_success.png", index, "tokens", "Tokens per success")
-
-    components = data.components
-    if not components.empty:
-        comp_tokens = components.groupby("component", observed=True)["total_tokens"].sum().reset_index()
-        comp_tokens = comp_tokens.sort_values("total_tokens", ascending=False).head(25)
-        comp_tokens["component_label"] = comp_tokens["component"].map(_short_component)
-        comp_tokens["total_tokens_k"] = comp_tokens["total_tokens"] / 1_000
-        fig, ax = plt.subplots(figsize=(11, max(5, len(comp_tokens) * 0.32)))
-        sns.barplot(data=comp_tokens, y="component_label", x="total_tokens_k", ax=ax, color="#4C78A8")
-        ax.set_title("Top Components by Token Usage", loc="left", pad=14)
-        ax.set_xlabel("tokens (K)")
-        ax.set_ylabel("")
-        _save(fig, out_dir / "tokens" / "component_tokens.png", index, "tokens", "Component token usage")
-
-        comp_duration = components.groupby("component", observed=True)["duration_ms"].sum().reset_index()
-        comp_duration = comp_duration.sort_values("duration_ms", ascending=False).head(25)
-        comp_duration["component_label"] = comp_duration["component"].map(_short_component)
-        comp_duration["duration_s"] = comp_duration["duration_ms"] / 1_000
-        fig, ax = plt.subplots(figsize=(11, max(5, len(comp_duration) * 0.32)))
-        sns.barplot(data=comp_duration, y="component_label", x="duration_s", ax=ax, color="#72B7B2")
-        ax.set_title("Top Components by Span Duration", loc="left", pad=14)
-        ax.set_xlabel("aggregate span duration (s)")
-        ax.set_ylabel("")
-        _save(fig, out_dir / "tokens" / "component_duration.png", index, "tokens", "Component duration")
-
-    spans = data.spans
-    if not spans.empty:
-        ops = spans[spans["operation"].astype(str).str.contains("llm|tool", case=False, regex=True)]
-        if not ops.empty:
-            counts = ops.groupby(["example", "operation"], observed=True).size().reset_index(name="spans")
-            counts = _with_display_columns(counts)
-            counts["operation_label"] = counts["operation"].map(_short_component)
-            fig, ax = plt.subplots(figsize=(13, 6))
-            sns.barplot(data=counts, x="example_display", y="spans", hue="operation_label", ax=ax, palette="tab20", errorbar=None, order=_example_axis_order(counts))
-            ax.set_title("LLM and Tool Span Counts", loc="left", pad=14)
-            ax.set_xlabel("")
-            ax.set_ylabel("span count")
-            ax.tick_params(axis="x", rotation=15)
-            _outside_legend(ax, "Operation")
-            _save(fig, out_dir / "tokens" / "llm_tool_spans.png", index, "tokens", "LLM and tool spans")
-
-
 def _resource_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> None:
     cases = _with_display_columns(_actual(data.cases))
     resources = data.resources
@@ -500,59 +421,6 @@ def _resource_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) ->
         _save(fig, out_dir / "resources" / "resource_timelines_top_memory.png", index, "resources", "Top memory timelines")
 
 
-def _trace_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> None:
-    traces = data.traces
-    spans = data.spans
-    cases = _with_display_columns(_actual(data.cases))
-    if cases.empty:
-        return
-    trace_counts = traces.groupby("case_name", observed=True).size().reset_index(name="trace_count") if not traces.empty else pd.DataFrame(columns=["case_name", "trace_count"])
-    plot = cases.merge(trace_counts, on="case_name", how="left").fillna({"trace_count": 0})
-    fig, ax = plt.subplots(figsize=(15, max(7, len(plot) * 0.22)))
-    y = np.arange(len(plot))
-    ax.barh(y, plot["requests"], color="#cbd5e0", label="requests")
-    ax.barh(y, plot["trace_count"], color="#0072B2", label="traces")
-    ax.set_yticks(y)
-    ax.set_yticklabels(plot["case_name"].map(_short_case_label), fontsize=8)
-    ax.invert_yaxis()
-    ax.set_title("Trace Count vs Request Count", loc="left", pad=14)
-    ax.set_xlabel("count")
-    ax.legend(loc="lower right", frameon=False)
-    _save(fig, out_dir / "traces" / "trace_coverage.png", index, "traces", "Trace coverage")
-
-    if not traces.empty:
-        trace_plot = _with_display_columns(traces)
-        fig, ax = plt.subplots(figsize=(10, 5.5))
-        sns.histplot(
-            data=trace_plot,
-            x="span_count",
-            hue="example_display",
-            hue_order=_example_axis_order(trace_plot),
-            multiple="stack",
-            ax=ax,
-            palette="tab10",
-            bins=20,
-        )
-        ax.set_title("Spans per Trace Distribution", loc="left", pad=14)
-        ax.set_xlabel("spans per trace")
-        ax.set_ylabel("trace count")
-        _save(fig, out_dir / "traces" / "spans_per_trace.png", index, "traces", "Spans per trace")
-
-    if not spans.empty:
-        span_plot = spans.copy()
-        span_plot["operation_label"] = span_plot["operation"].map(_short_component)
-        span_plot["service_label"] = span_plot["service"].map(_short_service)
-        op_service = span_plot.groupby(["operation_label", "service_label"], observed=True).size().reset_index(name="spans")
-        op_service = op_service.sort_values("spans", ascending=False).head(45)
-        matrix = op_service.pivot_table(index="operation_label", columns="service_label", values="spans", aggfunc="sum", fill_value=0, observed=True)
-        fig, ax = plt.subplots(figsize=(14, max(6, 0.34 * len(matrix.index))))
-        sns.heatmap(matrix, ax=ax, cmap="Blues", linewidths=0.4, linecolor="white", cbar_kws={"label": "spans"})
-        ax.set_title("Operation by Service Span Heatmap", loc="left", pad=14)
-        ax.set_xlabel("service")
-        ax.set_ylabel("operation")
-        _save(fig, out_dir / "traces" / "operation_service_heatmap.png", index, "traces", "Operation/service heatmap")
-
-
 def _topology_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> None:
     cases = data.expected_cases if not data.expected_cases.empty else data.cases
     if cases.empty:
@@ -573,7 +441,8 @@ def _topology_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) ->
 def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> None:
     cases = _with_display_columns(_actual(data.cases))
     requests = _with_display_columns(_actual(data.requests))
-    components = _actual(data.components)
+    agent_metrics = _with_display_columns(_actual(data.agent_metrics))
+    traces = _with_display_columns(_actual(data.traces))
     expected = _with_display_columns(_actual(data.expected_cases))
     if cases.empty:
         return
@@ -581,7 +450,8 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
     examples: list[dict[str, Any]] = []
     expected_by_example = _groups(expected, "example")
     requests_by_example = _groups(requests, "example")
-    components_by_example = _groups(components, "example")
+    agents_by_example = _groups(agent_metrics, "example")
+    traces_by_example = _groups(traces, "example")
     empty = pd.DataFrame()
     for example, ex_cases in cases.groupby("example", observed=True, sort=False):
         example = str(example)
@@ -650,15 +520,26 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
         _outside_legend(ax, "Protocol")
         entry["plots"].append({"title": "Throughput", "path": _save(fig, example_dir / "throughput.png", index)})
 
-        token_plot = ex_cases.sort_values("total_tokens", ascending=False)
-        fig, ax = plt.subplots(figsize=(14, 6))
-        token_plot["total_tokens_k"] = token_plot["total_tokens"] / 1_000
-        sns.barplot(data=token_plot, x="case_axis", y="total_tokens_k", hue="spec_display", hue_order=_spec_hue_order(token_plot), ax=ax, palette=_spec_palette(token_plot), errorbar=None, order=_axis_order(token_plot), legend=False)
-        ax.set_title(f"{example_display}: Total Tokens", loc="left", pad=14)
-        ax.set_xlabel("")
-        ax.set_ylabel("tokens (K)")
-        ax.tick_params(axis="x", rotation=0)
-        entry["plots"].append({"title": "Total tokens", "path": _save(fig, example_dir / "tokens.png", index)})
+        ex_agents = agents_by_example.get(example, empty)
+        if not ex_agents.empty:
+            agent_plot = _prepare_agent_metric_plot(ex_agents, ex_cases)
+            fig = _draw_agent_time(agent_plot, f"{example_display}: Average Agent Time per Request")
+            path = _save(fig, out_dir / "agents" / f"{slug}_agent_time.png", index, "agents", f"{example_display} agent time")
+            entry["plots"].append({"title": "Average agent time per request", "path": path})
+
+            fig = _draw_agent_tokens(agent_plot, f"{example_display}: Average Agent Token Use per Successful Request")
+            path = _save(fig, out_dir / "agents" / f"{slug}_agent_tokens.png", index, "agents", f"{example_display} agent tokens")
+            entry["plots"].append({"title": "Average agent input/output tokens", "path": path})
+
+        ex_traces = traces_by_example.get(example, empty)
+        if not ex_traces.empty:
+            fig = _draw_spans_per_trace_distribution(ex_traces, f"{example_display}: Spans per Trace Distribution")
+            path = _save(fig, out_dir / "spans_per_trace" / f"{slug}_spans_per_trace_distribution.png", index, "spans_per_trace", f"{example_display} spans per trace distribution")
+            entry["plots"].append({"title": "Spans per trace distribution", "path": path})
+
+            fig = _draw_spans_per_trace_summary(ex_traces, f"{example_display}: Spans per Trace by Protocol")
+            path = _save(fig, out_dir / "spans_per_trace" / f"{slug}_spans_per_trace_summary.png", index, "spans_per_trace", f"{example_display} spans per trace summary")
+            entry["plots"].append({"title": "Spans per trace by protocol", "path": path})
 
         ex_requests = requests_by_example.get(example, empty)
         if not ex_requests.empty:
@@ -700,22 +581,180 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
             )
             entry["plots"].append({"title": "Request latency CDF", "path": _save(fig, example_dir / "request_latency_cdf.png", index)})
 
-        ex_components = components_by_example.get(example, empty)
-        if not ex_components.empty:
-            comp = ex_components.groupby("component", observed=True).agg(duration_ms=("duration_ms", "sum"), total_tokens=("total_tokens", "sum")).reset_index()
-            comp = comp.sort_values("duration_ms", ascending=False).head(18)
-            comp["component_label"] = comp["component"].map(_short_component)
-            comp["duration_s"] = comp["duration_ms"] / 1_000
-            fig, ax = plt.subplots(figsize=(11, max(5, len(comp) * 0.35)))
-            sns.barplot(data=comp, y="component_label", x="duration_s", ax=ax, color="#72B7B2")
-            ax.set_title(f"{example_display}: Component Duration", loc="left", pad=14)
-            ax.set_xlabel("aggregate span duration (s)")
-            ax.set_ylabel("")
-            entry["plots"].append({"title": "Component duration", "path": _save(fig, example_dir / "component_duration.png", index)})
-
         examples.append(entry)
 
     index["examples"] = examples
+
+
+def _prepare_agent_metric_plot(agent_metrics: pd.DataFrame, cases: pd.DataFrame) -> pd.DataFrame:
+    counts = cases[["case_name", "requests", "successes"]].copy()
+    out = agent_metrics.merge(counts, on="case_name", how="left")
+    request_denom = out["requests"].where(out["requests"] > 0, np.nan)
+    success_denom = out["successes"].where(out["successes"] > 0, out["requests"])
+    success_denom = success_denom.where(success_denom > 0, np.nan)
+    out["duration_s_per_request"] = (out["duration_ms"] / 1_000.0 / request_denom).fillna(0.0)
+    out["input_tokens_per_success"] = (out["input_tokens"] / success_denom).fillna(0.0)
+    out["output_tokens_per_success"] = (out["output_tokens"] / success_denom).fillna(0.0)
+    out["total_tokens_per_success"] = (out["total_tokens"] / success_denom).fillna(0.0)
+    out["agent_label"] = out["agent"].map(_short_agent)
+    return out
+
+
+def _draw_agent_time(plot: pd.DataFrame, title: str) -> plt.Figure:
+    plot = plot[plot["duration_s_per_request"] > 0].copy()
+    if plot.empty:
+        return _blank_figure("No traced agent duration found")
+    agent_order = plot.groupby("agent_label", observed=True)["duration_s_per_request"].mean().sort_values(ascending=False).index.tolist()
+    fig, ax = plt.subplots(figsize=(13, max(5.0, 0.52 * len(agent_order) + 2.0)))
+    sns.barplot(
+        data=plot,
+        y="agent_label",
+        x="duration_s_per_request",
+        hue="spec_display",
+        hue_order=_spec_hue_order(plot),
+        order=agent_order,
+        ax=ax,
+        palette=_spec_palette(plot),
+        errorbar=None,
+    )
+    ax.set_title(title, loc="left", pad=14)
+    ax.set_xlabel("average seconds / request")
+    ax.set_ylabel("")
+    ax.grid(axis="x", alpha=0.35)
+    ax.grid(axis="y", visible=False)
+    _outside_legend(ax, "Protocol")
+    sns.despine(ax=ax, left=True, bottom=False)
+    return fig
+
+
+def _draw_agent_tokens(plot: pd.DataFrame, title: str) -> plt.Figure:
+    plot = plot[plot["total_tokens_per_success"] > 0].copy()
+    if plot.empty:
+        return _blank_figure("No attributed agent tokens found")
+    plot = (
+        plot.groupby(["spec", "spec_display", "agent_label"], observed=True)
+        .agg(
+            input_tokens_per_success=("input_tokens_per_success", "mean"),
+            output_tokens_per_success=("output_tokens_per_success", "mean"),
+            total_tokens_per_success=("total_tokens_per_success", "mean"),
+        )
+        .reset_index()
+    )
+    spec_labels = _spec_hue_order(plot)
+    agent_order = plot.groupby("agent_label", observed=True)["total_tokens_per_success"].mean().sort_values(ascending=False).index.tolist()
+    max_tokens = float(plot["total_tokens_per_success"].max())
+    ncols = max(1, len(spec_labels))
+    fig, axes = plt.subplots(
+        1,
+        ncols,
+        figsize=(max(9.5, 4.5 * ncols), max(5.2, 0.5 * len(agent_order) + 2.2)),
+        sharey=True,
+        squeeze=False,
+    )
+    y = np.arange(len(agent_order))
+    for index, spec_label in enumerate(spec_labels):
+        ax = axes[0][index]
+        frame = plot[plot["spec_display"] == spec_label].set_index("agent_label").reindex(agent_order)
+        input_tokens = frame["input_tokens_per_success"].fillna(0.0).to_numpy()
+        output_tokens = frame["output_tokens_per_success"].fillna(0.0).to_numpy()
+        ax.barh(y, input_tokens, color="#2563eb", alpha=0.88)
+        ax.barh(y, output_tokens, left=input_tokens, color="#7c3aed", alpha=0.86)
+        ax.set_title(spec_label, loc="left", pad=10)
+        ax.set_yticks(y)
+        if index == 0:
+            ax.set_yticklabels(agent_order)
+        else:
+            ax.tick_params(axis="y", labelleft=False)
+        ax.grid(axis="x", alpha=0.35)
+        ax.grid(axis="y", visible=False)
+        ax.set_xlabel("average tokens / successful request")
+        if max_tokens >= 1_000:
+            _format_count_axis(ax, 1_000, "K")
+            ax.set_xlabel("average K tokens / successful request")
+        ax.set_xlim(0, max(max_tokens * 1.1, 1.0))
+        sns.despine(ax=ax, left=index != 0, bottom=False)
+    axes[0][0].invert_yaxis()
+    fig.suptitle(title, x=0.02, ha="left", fontweight="bold")
+    fig.legend(
+        handles=[Patch(color="#2563eb", label="input"), Patch(color="#7c3aed", label="output")],
+        loc="upper right",
+        frameon=False,
+        ncols=2,
+    )
+    return fig
+
+
+def _draw_spans_per_trace_distribution(traces: pd.DataFrame, title: str) -> plt.Figure:
+    traces = traces[traces["span_count"] > 0].copy()
+    if traces.empty:
+        return _blank_figure("No trace spans found")
+    spec_labels = _spec_hue_order(traces)
+    palette = _spec_palette(traces)
+    fig, ax = plt.subplots(figsize=(10.5, 5.8))
+
+    for spec_label in spec_labels:
+        values = np.sort(traces[traces["spec_display"] == spec_label]["span_count"].to_numpy(dtype=float))
+        if len(values) == 0:
+            continue
+        y = np.arange(1, len(values) + 1) / len(values)
+        ax.step(values, y, where="post", color=palette.get(spec_label, "#666666"), linewidth=2.2, label=f"{spec_label} (n={len(values)})")
+    ax.set_title(title, loc="left", pad=14)
+    ax.set_xlabel("spans per trace")
+    ax.set_ylabel("traces <= span count")
+    ax.yaxis.set_major_formatter(PercentFormatter(1.0))
+    ax.set_ylim(0, 1.01)
+    ax.grid(alpha=0.35)
+    ax.legend(loc="lower right", frameon=True, framealpha=0.9, facecolor="white")
+    sns.despine(ax=ax)
+    return fig
+
+
+def _draw_spans_per_trace_summary(traces: pd.DataFrame, title: str) -> plt.Figure:
+    traces = traces[traces["span_count"] > 0].copy()
+    if traces.empty:
+        return _blank_figure("No trace spans found")
+    spec_labels = _spec_hue_order(traces)
+    palette = _spec_palette(traces)
+    fig, ax = plt.subplots(figsize=(10.5, 5.2))
+    sns.boxplot(
+        data=traces,
+        y="spec_display",
+        x="span_count",
+        order=spec_labels,
+        hue="spec_display",
+        hue_order=spec_labels,
+        palette=palette,
+        ax=ax,
+        width=0.48,
+        linewidth=1.4,
+        fliersize=3,
+        legend=False,
+    )
+    summary_max = float(traces["span_count"].max())
+    pad = max(1.0, summary_max * 0.025)
+    for pos, spec_label in enumerate(spec_labels):
+        values = traces[traces["spec_display"] == spec_label]["span_count"].to_numpy(dtype=float)
+        if len(values) == 0:
+            continue
+        avg = float(np.mean(values))
+        ax.plot(avg, pos, marker="D", markerfacecolor="white", markeredgecolor="#1f2937", markeredgewidth=1.5, markersize=6, zorder=4)
+        ax.text(summary_max + pad, pos, f"n={len(values)}", va="center", fontsize=9, color="#475569")
+    ax.set_title(title, loc="left", pad=14)
+    ax.set_xlabel("spans per trace")
+    ax.set_ylabel("")
+    ax.set_xlim(0, summary_max * 1.1 + pad * 3)
+    ax.grid(axis="x", alpha=0.35)
+    ax.grid(axis="y", visible=False)
+    ax.legend(
+        handles=[
+            Line2D([0], [0], marker="D", color="#334155", markerfacecolor="white", linewidth=0, label="average"),
+        ],
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.12),
+        frameon=False,
+    )
+    sns.despine(ax=ax)
+    return fig
 
 
 def _case_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any], max_case_waterfalls: int) -> None:
@@ -723,12 +762,10 @@ def _case_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any], max_ca
     requests = _with_display_columns(data.requests)
     resources = data.resources
     spans = data.spans
-    components = data.components
     waterfalls = 0
     requests_by_case = _groups(requests, "case_name")
     resources_by_case = _groups(resources, "case_name")
     spans_by_case = _groups(spans, "case_name")
-    components_by_case = _groups(components, "case_name")
     empty = pd.DataFrame()
     for case in cases["case_name"].astype(str).tolist():
         case_dir = out_dir / "cases" / _slug(case)
@@ -770,19 +807,6 @@ def _case_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any], max_ca
             axes[1].set_xlabel("elapsed seconds")
             _outside_legend(axes[1], "Container")
             case_entry["plots"].append(_save(fig, case_dir / "resources.png", index))
-
-        comp = components_by_case.get(case, empty)
-        if not comp.empty:
-            comp = comp.sort_values("duration_ms", ascending=False).head(18)
-            comp = comp.copy()
-            comp["component_label"] = comp["component"].map(_short_component)
-            comp["duration_s"] = comp["duration_ms"] / 1_000
-            fig, ax = plt.subplots(figsize=(9, max(4, len(comp) * 0.32)))
-            sns.barplot(data=comp, y="component_label", x="duration_s", ax=ax, color="#72B7B2")
-            ax.set_title(f"{_short_case_label(case)}: Component Duration", loc="left", pad=12)
-            ax.set_xlabel("duration (s)")
-            ax.set_ylabel("")
-            case_entry["plots"].append(_save(fig, case_dir / "components.png", index))
 
         span_case = spans_by_case.get(case, empty)
         if not span_case.empty and waterfalls < max_case_waterfalls:
@@ -1063,6 +1087,13 @@ def _short_component(value: Any) -> str:
     return " ".join(text.split())
 
 
+def _short_agent(value: Any) -> str:
+    text = str(value)
+    if text == "Unattributed":
+        return text
+    return re.sub(r"(?<!^)(?=[A-Z])", " ", text).replace(" Q C", " QC")
+
+
 def _short_service(value: Any) -> str:
     text = str(value)
     text = text.replace("unknown_service:", "")
@@ -1119,6 +1150,13 @@ def _placeholder(path: Path, text: str) -> None:
     ax.axis("off")
     fig.savefig(path, dpi=160, bbox_inches="tight")
     plt.close(fig)
+
+
+def _blank_figure(text: str) -> plt.Figure:
+    fig, ax = plt.subplots(figsize=(8, 3))
+    ax.text(0.5, 0.5, text, ha="center", va="center", fontsize=14)
+    ax.axis("off")
+    return fig
 
 
 def _actual(frame: pd.DataFrame) -> pd.DataFrame:
