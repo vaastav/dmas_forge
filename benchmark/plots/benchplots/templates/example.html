@@ -75,6 +75,7 @@
       <p>{{ model_name }}</p>
       <nav class="side-nav" aria-label="Example sections">
         <a href="#summary">Summary</a>
+        <a href="#errors">Errors</a>
         <a href="#charts">Charts</a>
         <a href="#spec-comparison">Spec Comparison</a>
         <a href="#cases">Cases</a>
@@ -105,6 +106,19 @@
         </div>
         <h3>Error Categories</h3>
         {{ table(errors, ["category", "count"]) }}
+      </section>
+
+      <section id="errors" class="section-card">
+        <h2>Errors</h2>
+        <p class="muted">Request failures are benchmark-facing failed HTTP attempts. Application span errors are internal instrumented errors and may be recovered before the request completes.</p>
+        <h3>Request Failure Reasons</h3>
+        {{ table(request_failure_reasons, ["category", "reason", "failed_requests"]) }}
+        <h3>Cases With Request Failures</h3>
+        {{ table(request_failure_cases, ["protocol", "profile", "failed_requests", "failure_rate", "category", "reason"]) }}
+        <h3>Application Span Error Categories</h3>
+        {{ table(span_error_reasons, ["category", "reason", "span_errors", "cases", "request_failing_cases"]) }}
+        <h3>Application Span Error Sources</h3>
+        {{ table(span_error_sources, ["service_short", "operation", "category", "reason", "span_errors", "cases", "request_failing_cases", "outcome"]) }}
       </section>
 
       <section id="charts" class="section-card">

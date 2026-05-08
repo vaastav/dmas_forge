@@ -49,13 +49,14 @@ def _render(env: Environment, data: BenchmarkRun, plot_index: dict[str, Any]) ->
         case_plots=plot_index.get("cases", []),
         case_details=_case_details(cases, plot_index.get("cases", [])),
         kpis=_run_kpis(cases, expected),
-        partial=_sorted_case_records(partial, ["example", "spec", "profile"]),
-        failed=_sorted_case_records(failed, ["example", "spec", "profile"]),
         top_latency=top_latency_records,
         top_latency_groups=_group_records(top_latency_records, "example"),
         topology_groups=_topology_groups(plot_index.get("sections", {}).get("topology", [])),
         agent_check_note=_agent_check_note(data.agent_checks),
-        errors=_error_rows(data.errors),
+        request_failure_reasons=_request_failure_reason_rows(data.error_details),
+        request_failure_cases=_request_failure_case_rows(data.error_details, cases),
+        span_error_reasons=_span_error_reason_rows(data.spans, data.error_details),
+        span_error_sources=_span_error_source_rows(data.spans, data.error_details, limit=40),
         profiles=_profile_table(data.run_info, cases),
         intra_spec_comparisons=intra_spec_records,
         intra_spec_groups=_group_records(intra_spec_records, "example"),
@@ -81,6 +82,8 @@ def _render_example(
     expected = data.expected_cases[data.expected_cases["example"].astype(str) == example].copy() if not data.expected_cases.empty else pd.DataFrame()
     partial = cases[cases["errors"] > 0] if not cases.empty else pd.DataFrame()
     errors = data.errors[data.errors["example"].astype(str) == example] if not data.errors.empty else pd.DataFrame()
+    error_details = data.error_details[data.error_details["example"].astype(str) == example] if not data.error_details.empty else pd.DataFrame()
+    spans = data.spans[data.spans["example"].astype(str) == example] if not data.spans.empty else pd.DataFrame()
 
     topology = [
         {"title": item["title"], "path": _rel(out_dir / item["path"], page_dir)}
@@ -118,6 +121,10 @@ def _render_example(
         spec_comparisons=_records(_spec_comparisons(cases)),
         partial=_sorted_case_records(partial, ["spec", "profile"]),
         errors=_error_rows(errors),
+        request_failure_reasons=_request_failure_reason_rows(error_details),
+        request_failure_cases=_request_failure_case_rows(error_details, cases),
+        span_error_reasons=_span_error_reason_rows(spans, error_details),
+        span_error_sources=_span_error_source_rows(spans, error_details, limit=30),
     )
 
 
@@ -381,6 +388,102 @@ def _error_rows(errors: pd.DataFrame) -> list[dict[str, Any]]:
     return [{"category": _error_label(k), "count": int(v)} for k, v in counts.items()]
 
 
+def _request_failure_reason_rows(error_details: pd.DataFrame) -> list[dict[str, Any]]:
+    if error_details.empty:
+        return []
+    counts = error_details.groupby(["error_category", "error_reason"], observed=True).size().reset_index(name="count")
+    counts = counts.sort_values(["count", "error_category", "error_reason"], ascending=[False, True, True]).head(20)
+    rows = []
+    for row in counts.itertuples(index=False):
+        rows.append({"category": _error_label(row.error_category), "reason": _display_reason(row.error_reason), "failed_requests": int(row.count)})
+    return rows
+
+
+def _request_failure_case_rows(error_details: pd.DataFrame, cases: pd.DataFrame) -> list[dict[str, Any]]:
+    if error_details.empty:
+        return []
+    grouped = (
+        error_details.groupby(["case_name", "example", "spec", "profile"], observed=True)
+        .agg(
+            failed_requests=("sequence", "count"),
+            reason=("error_reason", _top_value),
+            category=("error_category", _top_value),
+        )
+        .reset_index()
+    )
+    case_requests = dict(zip(cases["case_name"], cases["requests"], strict=False)) if not cases.empty and {"case_name", "requests"}.issubset(cases.columns) else {}
+    grouped["requests"] = grouped["case_name"].map(case_requests).fillna(grouped["failed_requests"])
+    grouped["failure_rate"] = grouped["failed_requests"] / grouped["requests"].replace(0, 1)
+    grouped["reason"] = grouped["reason"].map(_display_reason)
+    grouped["category"] = grouped["category"].map(_error_label)
+    grouped = _sort_cases(grouped, ["example", "spec", "profile"])
+    return _records(_with_display_labels(_with_table_fields(grouped)))
+
+
+def _span_error_reason_rows(spans: pd.DataFrame, error_details: pd.DataFrame) -> list[dict[str, Any]]:
+    frame = _span_error_frame(spans, error_details)
+    if frame.empty:
+        return []
+    grouped = (
+        frame.groupby(["span_error_category", "span_error_reason"], observed=True)
+        .agg(
+            span_errors=("span_id", "count"),
+            cases=("case_name", "nunique"),
+            request_failing_cases=("request_failed_case_name", "nunique"),
+        )
+        .reset_index()
+        .sort_values(["span_errors", "span_error_category", "span_error_reason"], ascending=[False, True, True])
+        .head(20)
+    )
+    grouped["category"] = grouped["span_error_category"].map(_error_label)
+    grouped["reason"] = grouped["span_error_reason"].map(_display_reason)
+    return _records(grouped[["category", "reason", "span_errors", "cases", "request_failing_cases"]])
+
+
+def _span_error_source_rows(spans: pd.DataFrame, error_details: pd.DataFrame, limit: int) -> list[dict[str, Any]]:
+    frame = _span_error_frame(spans, error_details)
+    if frame.empty:
+        return []
+    group_cols = ["example", "service_short", "operation", "span_error_category", "span_error_reason", "span_outcome"]
+    grouped = (
+        frame.groupby(group_cols, observed=True)
+        .agg(span_errors=("span_id", "count"), cases=("case_name", "nunique"), request_failing_cases=("request_failed_case_name", "nunique"))
+        .reset_index()
+        .sort_values(["span_errors", "service_short", "operation"], ascending=[False, True, True])
+        .head(limit)
+    )
+    grouped["category"] = grouped["span_error_category"].map(_error_label)
+    grouped["reason"] = grouped["span_error_reason"].map(_display_reason)
+    grouped["outcome"] = grouped["span_outcome"]
+    grouped = _with_display_labels(grouped)
+    return _records(grouped)
+
+
+def _span_error_frame(spans: pd.DataFrame, error_details: pd.DataFrame) -> pd.DataFrame:
+    if spans.empty or "is_error" not in spans:
+        return pd.DataFrame()
+    frame = spans[spans["is_error"].fillna(False)].copy()
+    if frame.empty:
+        return pd.DataFrame()
+    failing_cases = set(error_details["case_name"].astype(str)) if not error_details.empty and "case_name" in error_details else set()
+    frame["request_failed_case"] = frame["case_name"].astype(str).isin(failing_cases)
+    frame["request_failed_case_name"] = frame["case_name"].where(frame["request_failed_case"], None)
+    frame["span_outcome"] = frame["request_failed_case"].map({True: "Request Failed", False: "Error Recovered"})
+    return frame
+
+
+def _display_reason(value: Any, limit: int = 140) -> str:
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 14)].rstrip() + "...<truncated>"
+
+
+def _top_value(values: pd.Series) -> str:
+    counts = values.astype(str).value_counts()
+    return str(counts.index[0]) if not counts.empty else ""
+
+
 def _agent_check_note(agent_checks: pd.DataFrame) -> str:
     if agent_checks.empty or "attribution_ok" not in agent_checks:
         return "Token check: no agent token check was available."
@@ -629,6 +732,14 @@ def format_cell(value: Any) -> str:
 COLUMN_LABELS = {
     "case_name": "Case",
     "category": "Error category",
+    "reason": "Reason",
+    "failed_requests": "Failed requests",
+    "failure_rate": "Failure rate",
+    "span_errors": "Span errors",
+    "request_failing_cases": "Request-failing cases",
+    "outcome": "Outcome",
+    "operation": "Operation",
+    "service_short": "Service",
     "count": "Requests",
     "example": "Example",
     "profile": "Profile",
@@ -672,6 +783,10 @@ ERROR_LABELS = {
     "http_500": "HTTP 500",
     "transport_500": "Transport 500",
     "workflow_no_report": "No workflow report",
+    "deadline_exceeded": "Deadline exceeded",
+    "client_timeout_headers": "Client header timeout",
+    "context_canceled": "Context canceled",
+    "response_parse_error": "Response parse error",
     "a2a_error": "A2A error",
     "mcp_error": "MCP error",
     "llm_error": "LLM error",
@@ -686,7 +801,11 @@ NUMERIC_COLUMNS = {
     "requests",
     "successes",
     "errors",
+    "failed_requests",
+    "span_errors",
+    "request_failing_cases",
     "success_rate",
+    "failure_rate",
     "throughput_rps",
     "p50_ms",
     "p95_ms",
@@ -706,7 +825,7 @@ def _error_label(value: Any) -> str:
 
 
 def cell_class(column: str) -> str:
-    classes = []
+    classes = [column]
     if column in NUMERIC_COLUMNS:
         classes.append("num")
     if column == "case_name":
@@ -717,7 +836,7 @@ def cell_class(column: str) -> str:
 def format_table_cell(column: str, value: Any, row: dict[str, Any] | None = None) -> str:
     if column == "request_summary" and not value and row:
         return _request_summary(row.get("successes"), row.get("requests"))
-    if column == "success_rate":
+    if column in {"success_rate", "failure_rate"}:
         return _format_percent(value)
     if column in {"p50_ms", "p95_ms", "p99_ms", "iqr_ms"}:
         return _format_latency(value)

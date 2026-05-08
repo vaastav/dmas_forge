@@ -163,6 +163,7 @@ tbody tr:nth-child(even) { background: #fbfdff; }
 tbody tr:last-child td { border-bottom: 0; }
 th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 td.case-name { min-width: 220px; white-space: normal; font-weight: 700; }
+td.reason { min-width: 260px; max-width: 560px; overflow-wrap: anywhere; }
 .table-note { max-width: 920px; margin: -2px 0 10px; font-size: 13px; }
 .table-group + .table-group { margin-top: 18px; }
 

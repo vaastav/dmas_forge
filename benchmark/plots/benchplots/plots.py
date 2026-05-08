@@ -18,7 +18,7 @@ from matplotlib.patches import Patch
 from matplotlib.ticker import FuncFormatter, PercentFormatter
 
 from .data import BenchmarkRun, write_normalized_data
-from .labels import example_case_label, example_label, example_sort_key
+from .labels import example_case_label, example_label, example_sort_key, short_service_name
 from .topology import EXAMPLES
 from .topology_draw import draw_topology
 
@@ -267,21 +267,30 @@ def _reliability_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any])
     cases = _with_display_columns(_actual(data.cases))
     if cases.empty:
         return
-    plot = cases[["case_name", "example", "spec", "profile", "successes", "errors"]].copy()
-    plot = _with_display_columns(plot)
-    fig, ax = plt.subplots(figsize=(16, max(7, len(plot) * 0.23)))
-    y = np.arange(len(plot))
-    ax.barh(y, plot["successes"], color=OUTCOME_COLORS["success"], label="successes")
-    ax.barh(y, plot["errors"], left=plot["successes"], color=OUTCOME_COLORS["failed / timeout"], label="failed / timeout")
-    ax.set_yticks(y)
-    ax.set_yticklabels(plot["case_name"].map(_short_case_label), fontsize=8)
-    ax.invert_yaxis()
-    ax.set_title("Request Outcomes by Example and Protocol", loc="left", pad=14)
-    ax.set_xlabel("request count")
-    max_requests = float((plot["successes"] + plot["errors"]).max())
-    ax.set_xlim(0, max(1.0, max_requests * 1.08))
-    _outside_legend(ax, "Outcome")
-    _save(fig, out_dir / "reliability" / "success_error_stacked.png", index, "reliability", "Success and error stack")
+    plot = cases[["case_name", "example", "example_display", "spec", "profile", "case_axis", "requests", "errors"]].copy()
+    plot["failure_rate"] = np.where(plot["requests"].astype(float) > 0, plot["errors"].astype(float) / plot["requests"].astype(float), np.nan)
+    matrix = plot.pivot_table(index="example_display", columns="case_axis", values="failure_rate", aggfunc="mean", observed=True)
+    matrix = matrix.reindex(columns=[col for col in _axis_order(plot) if col in matrix.columns])
+    matrix = matrix.reindex(index=[row for row in _example_axis_order(plot) if row in matrix.index])
+    annot_lookup = plot.set_index(["example_display", "case_axis"])[["errors", "requests"]].to_dict("index")
+    annot = matrix.copy().astype(object)
+    for row in matrix.index:
+        for col in matrix.columns:
+            values = annot_lookup.get((row, col), {})
+            if not values or pd.isna(matrix.loc[row, col]):
+                annot.loc[row, col] = "NA"
+            else:
+                annot.loc[row, col] = f"{int(values['errors'])}/{int(values['requests'])}"
+    fig, ax = plt.subplots(figsize=(16, max(4, 0.52 * len(matrix.index) + 2)))
+    cmap = sns.color_palette("Reds", as_cmap=True)
+    cmap.set_bad("#e5e7eb")
+    finite_values = matrix.to_numpy()[np.isfinite(matrix.to_numpy())]
+    vmax = max(0.01, float(finite_values.max()) if finite_values.size else 0.01)
+    sns.heatmap(matrix, ax=ax, vmin=0, vmax=vmax, cmap=cmap, linewidths=0.7, linecolor="white", annot=annot, fmt="", cbar_kws={"label": "failure rate"})
+    ax.set_title("Request Failures by Example and Protocol", loc="left", pad=14)
+    ax.set_xlabel("")
+    ax.set_ylabel("")
+    _save(fig, out_dir / "reliability" / "failure_rate_heatmap.png", index, "failures", "Request failure heatmap")
 
     errors = data.errors
     if not errors.empty:
@@ -291,31 +300,29 @@ def _reliability_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any])
         fig, ax = plt.subplots(figsize=(11, 5.5))
         sns.barplot(data=by_category, y="error_label", x="count", ax=ax, color=OUTCOME_COLORS["failed / timeout"])
         ax.bar_label(ax.containers[0], padding=3)
-        ax.set_title("Failure Categories", loc="left", pad=14)
+        ax.set_title("Request Failure Categories", loc="left", pad=14)
         ax.set_xlabel("failed requests")
         ax.set_ylabel("")
-        _save(fig, out_dir / "reliability" / "error_taxonomy.png", index, "reliability", "Error taxonomy")
+        _save(fig, out_dir / "reliability" / "request_failure_categories.png", index, "failures", "Request failure categories")
 
-        by_spec = errors.groupby(["example", "spec"], observed=True)["count"].sum().reset_index()
-        by_spec = _with_display_columns(by_spec)
-        fig, ax = plt.subplots(figsize=(11, 5.5))
-        sns.barplot(
-            data=by_spec,
-            x="example_display",
-            y="count",
-            hue="spec_display",
-            hue_order=_spec_hue_order(by_spec),
-            ax=ax,
-            palette=_spec_palette(by_spec),
-            errorbar=None,
-            order=_example_axis_order(by_spec),
-        )
-        ax.set_title("Failures by Example and Protocol", loc="left", pad=14)
-        ax.set_xlabel("")
-        ax.set_ylabel("failed requests")
-        ax.tick_params(axis="x", rotation=15)
-        _outside_legend(ax, "Protocol")
-        _save(fig, out_dir / "reliability" / "failures_by_spec.png", index, "reliability", "Failures by spec")
+    spans = data.spans
+    if not spans.empty and "is_error" in spans:
+        span_errors = spans[spans["is_error"].fillna(False)].copy()
+        if not span_errors.empty:
+            failing_cases = set(data.error_details["case_name"].astype(str)) if not data.error_details.empty and "case_name" in data.error_details else set()
+            span_errors["outcome"] = np.where(span_errors["case_name"].astype(str).isin(failing_cases), "Request Failed", "Error Recovered")
+            span_errors["workflow_service"] = span_errors["example"].map(example_label) + " / " + span_errors["service_short"].astype(str)
+            by_service = span_errors.groupby(["workflow_service", "outcome"], observed=True).size().reset_index(name="span_errors")
+            by_service = by_service.sort_values("span_errors", ascending=False)
+            fig, ax = plt.subplots(figsize=(13, max(4.5, 0.48 * by_service["workflow_service"].nunique() + 2)))
+            palette = {"Request Failed": "#D55E00", "Error Recovered": "#7A8EA4"}
+            order = by_service.groupby("workflow_service", observed=True)["span_errors"].sum().sort_values(ascending=False).index.tolist()
+            sns.barplot(data=by_service, y="workflow_service", x="span_errors", hue="outcome", order=order, ax=ax, palette=palette, errorbar=None)
+            ax.set_title("Application Span Errors by Workflow and Service", loc="left", pad=14)
+            ax.set_xlabel("span errors")
+            ax.set_ylabel("")
+            _outside_legend(ax, "Outcome")
+            _save(fig, out_dir / "reliability" / "span_errors_by_workflow_service.png", index, "failures", "Span errors by workflow and service")
 
 
 def _resource_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> None:
@@ -799,7 +806,7 @@ def _draw_longest_waterfall(case: str, spans: pd.DataFrame) -> plt.Figure | None
     if frame.empty:
         return None
     frame["operation_label"] = frame["operation"].map(_short_component)
-    frame["service_label"] = frame["service"].map(_short_service)
+    frame["service_label"] = frame["service"].map(short_service_name)
     frame["label"] = frame["operation_label"].astype(str) + "\n" + frame["service_label"].astype(str)
     frame = frame.tail(40) if len(frame) > 40 else frame
     fig, ax = plt.subplots(figsize=(12, max(5, len(frame) * 0.3)))
@@ -1148,14 +1155,6 @@ def _short_agent(value: Any) -> str:
     if text == "Unattributed":
         return text
     return re.sub(r"(?<!^)(?=[A-Z])", " ", text).replace(" Q C", " QC")
-
-
-def _short_service(value: Any) -> str:
-    text = str(value)
-    text = text.replace("unknown_service:", "")
-    text = text.removesuffix("_proc")
-    text = text.replace("_service", "")
-    return text.replace("_", " ")
 
 
 def _error_label(value: Any) -> str:

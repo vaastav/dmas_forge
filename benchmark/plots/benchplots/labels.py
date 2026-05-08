@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -73,3 +74,23 @@ def example_case_sort_key(value: Any) -> tuple[int, str]:
         if text.endswith(suffix):
             return example_sort_key(text[: -len(suffix)])
     return example_sort_key(text)
+
+
+def short_container_name(value: Any) -> str:
+    text = str(value or "")
+    for suffix in ("_ctr-1", "-1"):
+        if text.endswith(suffix):
+            text = text[: -len(suffix)]
+            break
+    match = re.match(r"^.*-[0-9a-f]{8}-(.+)$", text)
+    if match:
+        text = match.group(1)
+    return text.replace("_", " ").title()
+
+
+def short_service_name(value: Any) -> str:
+    text = str(value or "")
+    text = text.replace("unknown_service:", "")
+    text = text.removesuffix("_proc")
+    text = text.replace("_service", "")
+    return text.replace("_", " ") or "unknown"

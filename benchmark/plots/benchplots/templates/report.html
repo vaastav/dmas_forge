@@ -123,7 +123,7 @@
         <a href="#overview">Overview</a>
         <a href="#performance">Performance</a>
         <a href="#spec-comparisons">Spec Comparisons</a>
-        <a href="#reliability">Reliability</a>
+        <a href="#failures">Failures</a>
         <a href="#agents-traces">Agents &amp; Traces</a>
         <a href="#resources">Resources</a>
         <a href="#examples">Examples</a>
@@ -181,16 +181,8 @@
           <div><span>{{ format_table_cell("p95_ms", kpis.max_p95) }}</span><label>worst p95</label></div>
         </div>
 
-        <div class="split-grid">
-          <div>
-            <h3>Error Categories</h3>
-            {{ table(errors, ["category", "count"]) }}
-          </div>
-          <div>
-            <h3>Success Heatmap</h3>
-            {{ gallery(plots.get("overview", [])) }}
-          </div>
-        </div>
+        <h3>Success Heatmap</h3>
+        {{ gallery(plots.get("overview", [])) }}
       </section>
 
       <section id="performance" class="section-card">
@@ -211,13 +203,20 @@
         {{ grouped_tables(inter_example_groups, ["profile", "example", "request_summary", "success_rate", "throughput_rps", "p50_ms", "p95_ms", "iqr_ms"]) }}
       </section>
 
-      <section id="reliability" class="section-card">
-        <h2>Reliability</h2>
-        {{ gallery(plots.get("reliability", [])) }}
-        <h3>Failed Cases</h3>
-        {{ table(failed, ["case_name", "request_summary", "success_rate", "errors", "p95_ms"]) }}
-        <h3>Partial Cases</h3>
-        {{ table(partial, ["case_name", "request_summary", "success_rate", "errors", "p95_ms"]) }}
+      <section id="failures" class="section-card">
+        <h2>Failures &amp; Error Analysis</h2>
+        <p class="muted">Request failures are benchmark-facing failed HTTP attempts. Application span errors are internal instrumented errors and may be recovered before the request completes.</p>
+        {{ gallery(plots.get("failures", [])) }}
+        <h3>Request Failure Reasons</h3>
+        <p class="table-note muted">These counts are the true request failures used in the success/error totals.</p>
+        {{ table(request_failure_reasons, ["category", "reason", "failed_requests"]) }}
+        <h3>Cases With Request Failures</h3>
+        {{ table(request_failure_cases, ["example", "protocol", "profile", "failed_requests", "failure_rate", "category", "reason"]) }}
+        <h3>Application Span Error Categories</h3>
+        <p class="table-note muted">Span errors come from trace tags. They can be intermediate or retried errors, so these counts do not need to match request failures.</p>
+        {{ table(span_error_reasons, ["category", "reason", "span_errors", "cases", "request_failing_cases"]) }}
+        <h3>Application Span Error Sources</h3>
+        {{ table(span_error_sources, ["example", "service_short", "operation", "category", "reason", "span_errors", "cases", "request_failing_cases", "outcome"]) }}
       </section>
 
       <section id="agents-traces" class="section-card">

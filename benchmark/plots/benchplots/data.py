@@ -9,6 +9,7 @@ from typing import Any
 
 import pandas as pd
 
+from .labels import short_container_name, short_service_name
 from .topology import build_topology_rows
 
 SPEC_ORDER = ["single", "http", "mcp", "a2a", "memory", "no_memory", "automatic", "agentic"]
@@ -27,6 +28,7 @@ class BenchmarkRun:
     spans: pd.DataFrame
     traces: pd.DataFrame
     errors: pd.DataFrame
+    error_details: pd.DataFrame
     components: pd.DataFrame
     agent_metrics: pd.DataFrame
     agent_checks: pd.DataFrame
@@ -97,6 +99,7 @@ def load_run(results_root: Path, run_id: str) -> BenchmarkRun:
             )
         for row in _read_jsonl(case_dir / "requests.jsonl"):
             error = str(row.get("error", "") or "")
+            response_text = str(row.get("response_text", "") or "")
             request_rows.append(
                 {
                     **case_base,
@@ -106,7 +109,9 @@ def load_run(results_root: Path, run_id: str) -> BenchmarkRun:
                     "latency_ms": _num(row.get("latency_ms")),
                     "response_bytes": _num(row.get("response_bytes")),
                     "error": error,
+                    "response_text": response_text,
                     "error_category": "" if row.get("ok") else categorize_error(error, row.get("status")),
+                    "error_reason": "" if row.get("ok") else error_reason(error, row.get("status"), response_text),
                     "url": row.get("url", ""),
                 }
             )
@@ -117,7 +122,7 @@ def load_run(results_root: Path, run_id: str) -> BenchmarkRun:
                     "timestamp": row.get("timestamp", ""),
                     "container_id": row.get("container_id", ""),
                     "container_name": row.get("container_name", ""),
-                    "container_short": _short_container(row.get("container_name", "")),
+                    "container_short": short_container_name(row.get("container_name", "")),
                     "cpu_percent": _num(row.get("cpu_percent")),
                     "memory_bytes": _num(row.get("memory_bytes")),
                     "memory_percent": _num(row.get("memory_percent")),
@@ -125,13 +130,17 @@ def load_run(results_root: Path, run_id: str) -> BenchmarkRun:
             )
         for row in _read_jsonl(case_dir / "spans.jsonl"):
             tags = row.get("tags") if isinstance(row.get("tags"), dict) else {}
+            service = row.get("service_name", "unknown") or "unknown"
+            status_description = str(tags.get("otel.status_description", "") or "")
+            is_error = bool(tags.get("error")) or str(tags.get("otel.status_code", "")).upper() == "ERROR"
             span_rows.append(
                 {
                     **case_base,
                     "trace_id": row.get("trace_id", ""),
                     "span_id": row.get("span_id", ""),
                     "operation": row.get("operation_name", "unknown") or "unknown",
-                    "service": row.get("service_name", "unknown") or "unknown",
+                    "service": service,
+                    "service_short": short_service_name(service),
                     "start_time_us": _num(row.get("start_time")),
                     "duration_us": _num(row.get("duration")),
                     "duration_ms": _num(row.get("duration")) / 1000.0,
@@ -142,6 +151,14 @@ def load_run(results_root: Path, run_id: str) -> BenchmarkRun:
                     "input_tokens": _num(tags.get("llm.input_tokens")),
                     "output_tokens": _num(tags.get("llm.output_tokens")),
                     "total_tokens": _num(tags.get("llm.total_tokens")),
+                    "is_error": is_error,
+                    "status_code": tags.get("otel.status_code", ""),
+                    "status_description": status_description,
+                    "span_error_category": categorize_error(status_description) if is_error else "",
+                    "span_error_reason": error_reason(status_description) if is_error else "",
+                    "tool_name": tags.get("tool.name", ""),
+                    "tool_round": _num(tags.get("tool.round")),
+                    "max_tool_rounds_exhausted": bool(tags.get("llm.max_tool_rounds_exhausted")),
                     "parent_span_id": row.get("parent_span_id", ""),
                 }
             )
@@ -171,6 +188,7 @@ def load_run(results_root: Path, run_id: str) -> BenchmarkRun:
     components = _order_cases(pd.DataFrame(component_rows))
     agent_metrics = _order_cases(pd.DataFrame(agent_rows))
     errors = _build_errors(requests)
+    error_details = _build_error_details(requests)
     agent_checks = _build_agent_checks(cases, agent_metrics)
     topologies = build_topology_rows(expected_cases if not expected_cases.empty else cases)
 
@@ -185,6 +203,7 @@ def load_run(results_root: Path, run_id: str) -> BenchmarkRun:
         spans=spans,
         traces=traces,
         errors=errors,
+        error_details=error_details,
         components=components,
         agent_metrics=agent_metrics,
         agent_checks=agent_checks,
@@ -203,6 +222,7 @@ def write_normalized_data(data: BenchmarkRun, out_dir: Path) -> None:
         "spans": data.spans,
         "traces": data.traces,
         "errors": data.errors,
+        "error_details": data.error_details,
         "components": data.components,
         "agent_metrics": data.agent_metrics,
         "agent_checks": data.agent_checks,
@@ -221,6 +241,14 @@ def write_normalized_data(data: BenchmarkRun, out_dir: Path) -> None:
 
 def categorize_error(error: str, status: Any = None) -> str:
     text = (error or "").lower()
+    if "client.timeout exceeded while awaiting headers" in text:
+        return "client_timeout_headers"
+    if "context deadline exceeded" in text:
+        return "deadline_exceeded"
+    if "context canceled" in text or "context cancelled" in text:
+        return "context_canceled"
+    if "error parsing response json" in text or "unexpected end of json" in text:
+        return "response_parse_error"
     if "429" in text or "too many requests" in text or "rate-limit" in text or "rate limited" in text:
         return "rate_limit_429"
     if "statuscode was 500" in text:
@@ -240,6 +268,29 @@ def categorize_error(error: str, status: Any = None) -> str:
     if error:
         return "other_error"
     return "unknown_error"
+
+
+def error_reason(error: str, status: Any = None, response_text: str = "") -> str:
+    text = str(error or response_text or "").strip()
+    lower = text.lower()
+    if "client.timeout exceeded while awaiting headers" in lower:
+        return "Client timed out awaiting response headers"
+    if "error reading response body" in lower and "context deadline exceeded" in lower:
+        return "Response body read hit context deadline"
+    if "context deadline exceeded" in lower:
+        return "Context deadline exceeded"
+    if "context canceled" in lower or "context cancelled" in lower:
+        return "Context canceled"
+    if "error parsing response json" in lower:
+        return "Response JSON parse failed"
+    if "unexpected http status" in lower:
+        return text
+    if text:
+        return _compact_text(text, 160)
+    status_num = int(_num(status))
+    if status_num:
+        return f"HTTP {status_num}"
+    return "Unknown failure"
 
 
 def _read_json(path: Path, default: Any) -> Any:
@@ -574,16 +625,35 @@ def _build_errors(requests: pd.DataFrame) -> pd.DataFrame:
     return _order_cases(grouped)
 
 
-def _short_container(name: str) -> str:
-    text = str(name or "")
-    for suffix in ("_ctr-1", "-1"):
-        if text.endswith(suffix):
-            text = text[: -len(suffix)]
-            break
-    match = re.match(r"^.*-[0-9a-f]{8}-(.+)$", text)
-    if match:
-        text = match.group(1)
-    return text.replace("_", " ").title()
+def _build_error_details(requests: pd.DataFrame) -> pd.DataFrame:
+    columns = [
+        "case_name",
+        "example",
+        "spec",
+        "profile",
+        "sequence",
+        "status",
+        "latency_ms",
+        "response_bytes",
+        "error_category",
+        "error_reason",
+        "error",
+        "response_text",
+        "url",
+    ]
+    if requests.empty:
+        return pd.DataFrame(columns=columns)
+    errors = requests[~requests["ok"]].copy()
+    if errors.empty:
+        return pd.DataFrame(columns=columns)
+    return _order_cases(errors[[col for col in columns if col in errors.columns]])
+
+
+def _compact_text(value: Any, limit: int) -> str:
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 14)].rstrip() + "...<truncated>"
 
 
 def _json_records(frame: pd.DataFrame) -> list[dict[str, Any]]:
