@@ -30,6 +30,13 @@
       "timeout_seconds": 900
     },
     {
+      "name": "long-heavy",
+      "mode": "timed",
+      "value": 1200,
+      "concurrency": 8,
+      "timeout_seconds": 900
+    },
+    {
       "name": "short-sequential",
       "mode": "timed",
       "value": 300,
