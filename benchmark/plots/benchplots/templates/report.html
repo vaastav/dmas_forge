@@ -1,0 +1,229 @@
+{% macro gallery(items) -%}
+  {% if items %}
+  <div class="gallery">
+    {% for item in items %}
+    <figure>
+      <a href="{{ item.path }}"><img src="{{ item.path }}" alt="{{ item.title }}"></a>
+      <figcaption>{{ item.title }}</figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">No plots available for this section.</p>
+  {% endif %}
+{%- endmacro %}
+
+{% macro table(rows, columns) -%}
+  {% if rows %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr>{% for col in columns %}<th>{{ column_label(col) }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          {% for col in columns %}
+          <td class="{{ cell_class(col) }}">{{ format_table_cell(col, row.get(col), row) }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No rows.</p>
+  {% endif %}
+{%- endmacro %}
+
+{% macro grouped_tables(groups, columns) -%}
+  {% if groups %}
+    {% for group in groups %}
+    <div class="table-group">
+      <h4>{{ group.title }}</h4>
+      {{ table(group.rows, columns) }}
+    </div>
+    {% endfor %}
+  {% else %}
+  <p class="muted">No rows.</p>
+  {% endif %}
+{%- endmacro %}
+
+{% macro case_browser(cases) -%}
+  {% if cases %}
+  <div class="case-detail-list">
+    {% for case in cases %}
+    <details id="{{ case.anchor }}" class="case-detail">
+      <summary>
+        <span class="case-title">{{ case.case_name }}</span>
+        <span class="case-meta">{{ case.protocol }} &middot; {{ case.profile }} &middot; {{ format_table_cell("request_summary", case.request_summary, case) }} requests &middot; {{ format_table_cell("p95_ms", case.p95_ms, case) }} p95</span>
+      </summary>
+      {% if case.plots %}
+      <div class="case-plot-grid">
+        {% for plot in case.plots %}
+        <figure>
+          <a href="{{ plot.path }}"><img src="{{ plot.path }}" alt="{{ case.case_name }} {{ plot.title }}"></a>
+          <figcaption>{{ plot.title }}</figcaption>
+        </figure>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted case-empty">No plots available for this case.</p>
+      {% endif %}
+    </details>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">No cases.</p>
+  {% endif %}
+{%- endmacro %}
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Benchmark Plots {{ run_id }}</title>
+  <link rel="stylesheet" href="assets/report.css">
+</head>
+<body>
+  <div class="report-shell">
+    <aside class="sidebar">
+      <h1>Benchmark Report</h1>
+      <p>Run {{ run_id }}</p>
+      <p>{{ model_name }}</p>
+      <nav class="side-nav" aria-label="Report sections">
+        <a href="#overview">Overview</a>
+        <a href="#performance">Performance</a>
+        <a href="#spec-comparisons">Spec Comparisons</a>
+        <a href="#reliability">Reliability</a>
+        <a href="#agents-traces">Agents &amp; Traces</a>
+        <a href="#resources">Resources</a>
+        <a href="#examples">Examples</a>
+        <a href="#cases">Cases</a>
+        <a href="#topology">Topology</a>
+        <a href="#data">Data</a>
+      </nav>
+      {% if examples %}
+      <div class="nav-group">
+        <h2>Examples</h2>
+        {% for example in examples %}
+        <a href="{{ example.path }}">{{ example.example_label }}</a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </aside>
+
+    <main class="content">
+      <header class="page-header">
+        <h1>Run {{ run_id }}</h1>
+        <p>{{ generated_note }}</p>
+      </header>
+
+      <section id="overview" class="section-card">
+        <h2>Overview</h2>
+        <div class="kpi-grid">
+          <div><span>{{ kpis.cases }}</span><label>present cases</label></div>
+          <div><span>{{ kpis.expected }}</span><label>comparison cells</label></div>
+          <div><span>{{ kpis.requests }}</span><label>requests</label></div>
+          <div><span>{{ kpis.successes }}</span><label>successes</label></div>
+          <div><span>{{ kpis.failures }}</span><label>failures</label></div>
+          <div><span>{{ "%.1f%%"|format(kpis.avg_success_rate * 100) }}</span><label>success rate</label></div>
+          <div><span>{{ "{:,}".format(kpis.tokens) }}</span><label>tokens</label></div>
+          <div><span>{{ format_table_cell("p95_ms", kpis.max_p95) }}</span><label>max p95</label></div>
+        </div>
+        {{ gallery(plots.get("overview", [])) }}
+
+        <div class="split-grid">
+          <div>
+            <h3>Profiles</h3>
+            <p class="muted">Fixed request count profiles stop after the target request count; timed duration profiles keep issuing requests until the target duration elapses.</p>
+            {{ table(profiles, ["scope", "name", "load_type", "target", "concurrency", "timeout_seconds", "cases"]) }}
+          </div>
+          <div>
+            <h3>Error Categories</h3>
+            {{ table(errors, ["category", "count"]) }}
+          </div>
+        </div>
+      </section>
+
+      <section id="performance" class="section-card">
+        <h2>Performance</h2>
+        {{ gallery(plots.get("performance", [])) }}
+        <h3>Highest p95 Latency</h3>
+        <p class="table-note muted">Requests are successful / total completed requests. Completed Req/min is completed request attempts per elapsed minute. E2E latency and IQR are computed over successful requests from request dispatch to final response.</p>
+        {{ grouped_tables(top_latency_groups, ["protocol", "request_summary", "success_rate", "throughput_rps", "p50_ms", "p95_ms", "p99_ms", "iqr_ms"]) }}
+      </section>
+
+      <section id="spec-comparisons" class="section-card">
+        <h2>Spec Comparisons</h2>
+        <p class="muted">Intra-example rows compare specs within the same example and profile. Inter-example rows compare examples under the same spec and profile.</p>
+        <p class="table-note muted">Requests are successful / total completed requests. Completed Req/min is completed request attempts per elapsed minute. E2E IQR is p75 - p25 over successful end-to-end request latencies.</p>
+        <h3>Intra-Example</h3>
+        {{ grouped_tables(intra_spec_groups, ["profile", "spec", "request_summary", "success_rate", "throughput_rps", "p50_ms", "p95_ms", "iqr_ms"]) }}
+        <h3>Inter-Example</h3>
+        {{ grouped_tables(inter_example_groups, ["profile", "example", "request_summary", "success_rate", "throughput_rps", "p50_ms", "p95_ms", "iqr_ms"]) }}
+      </section>
+
+      <section id="reliability" class="section-card">
+        <h2>Reliability</h2>
+        {{ gallery(plots.get("reliability", [])) }}
+        <h3>Failed Cases</h3>
+        {{ table(failed, ["case_name", "request_summary", "success_rate", "errors", "p95_ms"]) }}
+        <h3>Partial Cases</h3>
+        {{ table(partial, ["case_name", "request_summary", "success_rate", "errors", "p95_ms"]) }}
+      </section>
+
+      <section id="agents-traces" class="section-card">
+        <h2>Agents &amp; Traces</h2>
+        <p class="muted">Agent charts show average agent seconds per request and average LLM token use per successful request. Trace charts show span-count distribution and protocol summaries.</p>
+        {{ gallery(plots.get("agents", [])) }}
+        <p class="footnote muted">{{ agent_check_note }}</p>
+        <h3>Spans per Trace</h3>
+        {{ gallery(plots.get("spans_per_trace", [])) }}
+      </section>
+
+      <section id="resources" class="section-card">
+        <h2>Resources</h2>
+        {{ gallery(plots.get("resources", [])) }}
+      </section>
+
+      <section id="examples" class="section-card">
+        <h2>Examples</h2>
+        <p class="muted">Use these pages to inspect one workflow across its protocols and profiles without the full-run noise. They keep the same evidence, but scope charts, tables, topology, and case details to one example.</p>
+        <div class="example-grid">
+          {% for example in examples %}
+          <a class="example-card" href="{{ example.path }}">
+            <strong>{{ example.example_label }}</strong>
+            <span>Open focused drilldown</span>
+          </a>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section id="cases" class="section-card">
+        <h2>Per-Case Detail</h2>
+        <p class="muted">Expand a case only when you need request, resource, or trace thumbnails in context.</p>
+        {{ case_browser(case_details) }}
+      </section>
+
+      <section id="topology" class="section-card">
+        <h2>Topology</h2>
+        {{ gallery(plots.get("topology", [])) }}
+      </section>
+
+      <section id="data" class="section-card">
+        <h2>Data Exports</h2>
+        <div class="links">
+          <a href="data/normalized.json">normalized.json</a>
+          <a href="data/cases.csv">cases.csv</a>
+          <a href="data/requests.csv">requests.csv</a>
+          <a href="data/resources.csv">resources.csv</a>
+          <a href="data/spans.csv">spans.csv</a>
+          <a href="data/traces.csv">traces.csv</a>
+          <a href="data/agent_metrics.csv">agent_metrics.csv</a>
+          <a href="data/agent_checks.csv">agent_checks.csv</a>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

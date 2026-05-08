@@ -1,0 +1,136 @@
+{% macro gallery(items) -%}
+  {% if items %}
+  <div class="gallery">
+    {% for item in items %}
+    <figure>
+      <a href="{{ item.path }}"><img src="{{ item.path }}" alt="{{ item.title }}"></a>
+      <figcaption>{{ item.title }}</figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">No plots available.</p>
+  {% endif %}
+{%- endmacro %}
+
+{% macro table(rows, columns) -%}
+  {% if rows %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr>{% for col in columns %}<th>{{ column_label(col) }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>{% for col in columns %}<td class="{{ cell_class(col) }}">{{ format_table_cell(col, row.get(col), row) }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No rows.</p>
+  {% endif %}
+{%- endmacro %}
+
+{% macro case_browser(cases) -%}
+  {% if cases %}
+  <div class="case-detail-list">
+    {% for case in cases %}
+    <details id="{{ case.anchor }}" class="case-detail">
+      <summary>
+        <span class="case-title">{{ case.case_name }}</span>
+        <span class="case-meta">{{ case.protocol }} &middot; {{ case.profile }} &middot; {{ format_table_cell("request_summary", case.request_summary, case) }} requests &middot; {{ format_table_cell("p95_ms", case.p95_ms, case) }} p95</span>
+      </summary>
+      {% if case.plots %}
+      <div class="case-plot-grid">
+        {% for plot in case.plots %}
+        <figure>
+          <a href="{{ plot.path }}"><img src="{{ plot.path }}" alt="{{ case.case_name }} {{ plot.title }}"></a>
+          <figcaption>{{ plot.title }}</figcaption>
+        </figure>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted case-empty">No plots available for this case.</p>
+      {% endif %}
+    </details>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">No cases.</p>
+  {% endif %}
+{%- endmacro %}
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ example_label }} - {{ run_id }}</title>
+  <link rel="stylesheet" href="{{ css }}">
+</head>
+<body>
+  <div class="report-shell">
+    <aside class="sidebar">
+      <h1>{{ example_label }}</h1>
+      <p>Run {{ run_id }}</p>
+      <p>{{ model_name }}</p>
+      <nav class="side-nav" aria-label="Example sections">
+        <a href="#summary">Summary</a>
+        <a href="#charts">Charts</a>
+        <a href="#spec-comparison">Spec Comparison</a>
+        <a href="#cases">Cases</a>
+        <a href="#topology">Topology</a>
+      </nav>
+      <div class="nav-group">
+        <h2>Report</h2>
+        <a href="{{ root_index }}">Full report</a>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="page-header">
+        <h1>{{ example_label }}</h1>
+        <p>This page scopes the run to one example so protocol, profile, case, topology, and error differences are easier to inspect.</p>
+      </header>
+
+      <section id="summary" class="section-card">
+        <h2>Summary</h2>
+        <div class="kpi-grid">
+          <div><span>{{ kpis.cases }}</span><label>present cases</label></div>
+          <div><span>{{ kpis.comparison_cells }}</span><label>comparison cells</label></div>
+          <div><span>{{ kpis.requests }}</span><label>requests</label></div>
+          <div><span>{{ kpis.successes }}</span><label>successes</label></div>
+          <div><span>{{ kpis.failures }}</span><label>failures</label></div>
+          <div><span>{{ "%.1f%%"|format(kpis.success_rate * 100) }}</span><label>success rate</label></div>
+          <div><span>{{ "{:,}".format(kpis.tokens) }}</span><label>tokens</label></div>
+        </div>
+        <h3>Error Categories</h3>
+        {{ table(errors, ["category", "count"]) }}
+      </section>
+
+      <section id="charts" class="section-card">
+        <h2>Charts</h2>
+        {{ gallery(plots) }}
+      </section>
+
+      <section id="spec-comparison" class="section-card">
+        <h2>Spec Comparison</h2>
+        <p class="table-note muted">Requests are successful / total completed requests. Completed Req/min is completed request attempts per elapsed minute. E2E latency and IQR are computed over successful requests from request dispatch to final response.</p>
+        {{ table(spec_comparisons, ["profile", "spec", "request_summary", "success_rate", "throughput_rps", "p50_ms", "p95_ms", "iqr_ms"]) }}
+        <h3>Partial or Failed Cases</h3>
+        {{ table(partial, ["case_name", "request_summary", "success_rate", "errors", "p95_ms"]) }}
+      </section>
+
+      <section id="cases" class="section-card">
+        <h2>Cases</h2>
+        <p class="muted">Expand a case to view request, resource, and trace thumbnails inline.</p>
+        {{ case_browser(case_details) }}
+      </section>
+
+      <section id="topology" class="section-card">
+        <h2>Topology</h2>
+        {{ gallery(topology) }}
+      </section>
+    </main>
+  </div>
+</body>
+</html>
