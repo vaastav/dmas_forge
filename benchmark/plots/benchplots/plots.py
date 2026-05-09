@@ -362,6 +362,15 @@ def _resource_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) ->
         _outside_legend(axes[1], "Case")
         _save(fig, out_dir / "resources" / "resource_timelines_top_memory.png", index, "resources", "Top memory timelines")
 
+        fig = _draw_high_memory_by_example(cases, resources)
+        _save(
+            fig,
+            out_dir / "resources" / "highest_memory_specs_by_example.png",
+            index,
+            "resources",
+            "Highest-memory spec comparison by example",
+        )
+
 
 def _topology_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> None:
     cases = data.expected_cases if not data.expected_cases.empty else data.cases
@@ -390,6 +399,7 @@ def _topology_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) ->
 def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> None:
     cases = _with_display_columns(_actual(data.cases))
     requests = _with_display_columns(_actual(data.requests))
+    resources = data.resources
     agent_metrics = _with_display_columns(_actual(data.agent_metrics))
     traces = _with_display_columns(_actual(data.traces))
     expected = _with_display_columns(_actual(data.expected_cases))
@@ -399,6 +409,7 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
     examples: list[dict[str, Any]] = []
     expected_by_example = _groups(expected, "example")
     requests_by_example = _groups(requests, "example")
+    resources_by_example = _groups(resources, "example")
     agents_by_example = _groups(agent_metrics, "example")
     traces_by_example = _groups(traces, "example")
     empty = pd.DataFrame()
@@ -538,6 +549,11 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
             )
             entry["plots"].append({"title": "Request latency CDF", "path": _save(fig, example_dir / "request_latency_cdf.png", index)})
 
+        ex_resources = resources_by_example.get(example, empty)
+        if not ex_resources.empty:
+            fig = _draw_high_memory_resource_detail(ex_cases, ex_resources, f"{example_display}: Highest-Memory Cases by Protocol")
+            entry["plots"].append({"title": "Highest-memory protocol comparison", "path": _save(fig, example_dir / "highest_memory_specs.png", index)})
+
         examples.append(entry)
 
     index["examples"] = examples
@@ -582,6 +598,104 @@ def _draw_agent_time(plot: pd.DataFrame, title: str) -> plt.Figure:
     _outside_legend(ax, "Protocol")
     sns.despine(ax=ax, left=True, bottom=False)
     return fig
+
+
+def _draw_high_memory_by_example(cases: pd.DataFrame, resources: pd.DataFrame) -> plt.Figure:
+    selected = _highest_memory_cases_by_spec(cases)
+    if selected.empty:
+        return _blank_figure("No memory summaries found")
+    plot = _resource_timeline_for_cases(resources, selected)
+    if plot.empty:
+        return _blank_figure("No resource samples found for highest-memory cases")
+
+    examples = [str(value) for value in _sort_for_display(selected).drop_duplicates("example")["example"].tolist()]
+    ncols = min(2, max(1, len(examples)))
+    nrows = int(np.ceil(len(examples) / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(15, max(5.0, 4.2 * nrows)), squeeze=False)
+    handles: dict[str, Line2D] = {}
+
+    for ax, example in zip(axes.flat, examples):
+        frame = plot[plot["example"].astype(str) == example]
+        _draw_resource_timeline_specs(ax, frame, example_label(example), "memory_mib", "memory (MiB)", handles)
+
+    for ax in axes.flat[len(examples):]:
+        ax.axis("off")
+    _right_figure_legend(fig, handles, "Protocol")
+    fig.suptitle("Highest-Memory Case Comparison by Example", x=0.02, ha="left", fontweight="bold")
+    return fig
+
+
+def _draw_high_memory_resource_detail(cases: pd.DataFrame, resources: pd.DataFrame, title: str) -> plt.Figure:
+    selected = _highest_memory_cases_by_spec(cases)
+    if selected.empty:
+        return _blank_figure("No memory summaries found")
+    plot = _resource_timeline_for_cases(resources, selected)
+    if plot.empty:
+        return _blank_figure("No resource samples found for highest-memory cases")
+
+    fig, axes = plt.subplots(2, 1, figsize=(14, 8), sharex=True)
+    handles: dict[str, Line2D] = {}
+    _draw_resource_timeline_specs(axes[0], plot, title, "cpu_percent", "CPU percent", handles)
+    _draw_resource_timeline_specs(axes[1], plot, "Memory timeline", "memory_mib", "memory (MiB)", handles)
+    axes[1].set_xlabel("elapsed seconds")
+    _right_figure_legend(fig, handles, "Protocol")
+    return fig
+
+
+def _highest_memory_cases_by_spec(cases: pd.DataFrame) -> pd.DataFrame:
+    if cases.empty or "memory_max_bytes" not in cases:
+        return pd.DataFrame()
+    cols = ["case_name", "example", "example_display", "spec", "spec_display", "profile", "case_axis", "memory_max_bytes"]
+    available = cases[[col for col in cols if col in cases.columns]].dropna(subset=["memory_max_bytes"]).copy()
+    available = available[available["memory_max_bytes"].astype(float) > 0]
+    if available.empty:
+        return available
+    selected = available.sort_values(["example", "spec", "memory_max_bytes"], ascending=[True, True, False])
+    selected = selected.drop_duplicates(["example", "spec"], keep="first")
+    return _sort_for_display(selected)
+
+
+def _resource_timeline_for_cases(resources: pd.DataFrame, selected: pd.DataFrame) -> pd.DataFrame:
+    if resources.empty or selected.empty:
+        return pd.DataFrame()
+    selected_cols = ["case_name", "example", "spec", "spec_display"]
+    meta = selected[[col for col in selected_cols if col in selected.columns]].drop_duplicates("case_name")
+    plot = resources[resources["case_name"].astype(str).isin(meta["case_name"].astype(str))].copy()
+    if plot.empty:
+        return plot
+    plot = plot.groupby(["case_name", "elapsed_s"], observed=True, as_index=False).agg(
+        cpu_percent=("cpu_percent", "sum"),
+        memory_bytes=("memory_bytes", "sum"),
+    )
+    plot = plot.merge(meta, on="case_name", how="left")
+    plot["memory_mib"] = plot["memory_bytes"] / 1024 / 1024
+    return _sort_for_display(plot)
+
+
+def _draw_resource_timeline_specs(
+    ax: plt.Axes,
+    frame: pd.DataFrame,
+    title: str,
+    y_col: str,
+    y_label: str,
+    handles: dict[str, Line2D],
+) -> None:
+    if frame.empty:
+        ax.text(0.5, 0.5, "No resource samples", ha="center", va="center", fontsize=12)
+        ax.axis("off")
+        return
+    ordered = _sort_for_display(frame).drop_duplicates("case_name")
+    for row in ordered.itertuples(index=False):
+        spec_label = str(row.spec_display)
+        case_frame = frame[frame["case_name"].astype(str) == str(row.case_name)].sort_values("elapsed_s")
+        color = SPEC_COLORS.get(spec_label, "#666666")
+        ax.plot(case_frame["elapsed_s"], case_frame[y_col], color=color, linewidth=2.1, alpha=0.9)
+        handles.setdefault(spec_label, Line2D([0], [0], color=color, linewidth=2.4, label=spec_label))
+    ax.set_title(title, loc="left", pad=12)
+    ax.set_ylabel(y_label)
+    ax.grid(alpha=0.35)
+    ax.margins(x=0.01)
+    sns.despine(ax=ax)
 
 
 def _draw_agent_tokens(plot: pd.DataFrame, title: str) -> plt.Figure:
@@ -1232,6 +1346,15 @@ def _outside_legend(ax: plt.Axes, title: str) -> None:
     handles, labels = ax.get_legend_handles_labels()
     if handles:
         ax.legend(handles, labels, title=title, loc="center left", bbox_to_anchor=(1.01, 0.5), frameon=False)
+
+
+def _right_figure_legend(fig: plt.Figure, handles: dict[str, Line2D], title: str) -> None:
+    if not handles:
+        return
+    legend = fig.legend(handles.values(), handles.keys(), title=title, loc="center left", bbox_to_anchor=(1.01, 0.5), frameon=True)
+    legend.get_frame().set_facecolor("white")
+    legend.get_frame().set_alpha(0.95)
+    legend.get_frame().set_edgecolor("#d9dee8")
 
 
 def _slug(value: str) -> str:
