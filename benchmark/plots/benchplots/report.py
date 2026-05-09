@@ -613,8 +613,6 @@ def _spec_comparisons(cases: pd.DataFrame) -> pd.DataFrame:
         if group["spec"].nunique() < 2:
             continue
         for row in _sort_by_spec(group).itertuples(index=False):
-            p95 = float(row.p95_ms)
-            throughput = float(row.throughput_rps)
             rows.append(
                 {
                     "example": example_label(example),
@@ -624,9 +622,9 @@ def _spec_comparisons(cases: pd.DataFrame) -> pd.DataFrame:
                     "successes": int(row.successes),
                     "success_rate": float(row.success_rate),
                     "p50_ms": float(row.p50_ms),
-                    "p95_ms": p95,
+                    "p95_ms": float(row.p95_ms),
                     "iqr_ms": float(getattr(row, "iqr_ms", 0.0)),
-                    "throughput_rps": throughput,
+                    "throughput_rps": float(row.throughput_rps) * 60.0,
                 }
             )
     return pd.DataFrame(rows)
@@ -652,7 +650,7 @@ def _example_spec_comparisons(cases: pd.DataFrame) -> pd.DataFrame:
                     "p50_ms": float(row.p50_ms),
                     "p95_ms": float(row.p95_ms),
                     "iqr_ms": float(getattr(row, "iqr_ms", 0.0)),
-                    "throughput_rps": float(row.throughput_rps),
+                    "throughput_rps": float(row.throughput_rps) * 60.0,
                 }
             )
     return pd.DataFrame(rows)

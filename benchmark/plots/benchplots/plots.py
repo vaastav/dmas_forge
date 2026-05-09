@@ -151,12 +151,13 @@ def _performance_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any])
     requests = _with_display_columns(_actual(data.requests))
     if cases.empty:
         return
+    cases["throughput_per_min"] = cases["throughput_rps"] * 60.0
 
     fig, ax = plt.subplots(figsize=(13, 6))
     sns.barplot(
         data=cases,
         x="example_display",
-        y="throughput_rps",
+        y="throughput_per_min",
         hue="spec_display",
         hue_order=_spec_hue_order(cases),
         ax=ax,
@@ -166,7 +167,7 @@ def _performance_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any])
     )
     ax.set_title("Throughput by Example and Protocol", loc="left", pad=14)
     ax.set_xlabel("")
-    ax.set_ylabel("requests / second")
+    ax.set_ylabel("requests / min")
     ax.tick_params(axis="x", rotation=15)
     _outside_legend(ax, "Protocol")
     _save(fig, out_dir / "performance" / "throughput_by_spec.png", index, "performance", "Throughput by spec")
@@ -210,29 +211,6 @@ def _performance_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any])
         fig.legend(handles, labels, title="Percentile", loc="center left", bbox_to_anchor=(1.01, 0.5), frameon=False)
     fig.suptitle("End-to-End Latency Percentiles by Protocol", x=0.02, ha="left", fontweight="bold")
     _save(fig, out_dir / "performance" / "latency_percentiles.png", index, "performance", "Latency percentiles")
-
-    p95 = cases.copy()
-    scale, label, fmt = _latency_scale(p95["p95_ms"])
-    p95["p95_display"] = p95["p95_ms"] / scale
-    matrix = p95.pivot_table(index="example_display", columns="case_axis", values="p95_display", aggfunc="mean", observed=True)
-    matrix = matrix.reindex(columns=[col for col in _axis_order(p95) if col in matrix.columns])
-    matrix = matrix.reindex(index=[row for row in _example_axis_order(p95) if row in matrix.index])
-    fig, ax = plt.subplots(figsize=(16, max(4, 0.52 * len(matrix.index) + 2)))
-    annot = matrix.map(lambda v: "" if pd.isna(v) else fmt.format(v))
-    sns.heatmap(
-        matrix,
-        ax=ax,
-        cmap="YlOrRd",
-        linewidths=0.7,
-        linecolor="white",
-        annot=annot,
-        fmt="",
-        cbar_kws={"label": label.replace("latency", "p95 latency")},
-    )
-    ax.set_title("P95 End-to-End Latency by Example and Protocol", loc="left", pad=16)
-    ax.set_xlabel("")
-    ax.set_ylabel("")
-    _save(fig, out_dir / "performance" / "p95_latency_heatmap.png", index, "performance", "P95 latency heatmap")
 
     if not requests.empty:
         fig = _draw_request_latency_by_example(requests, "End-to-End Request Latency CDF by Example", "cdf")
@@ -483,10 +461,11 @@ def _example_plots(data: BenchmarkRun, out_dir: Path, index: dict[str, Any]) -> 
 
         fig, ax = plt.subplots(figsize=(14, 6))
         ex_cases = ex_cases.copy()
-        sns.barplot(data=ex_cases, x="case_axis", y="throughput_rps", hue="spec_display", hue_order=_spec_hue_order(ex_cases), ax=ax, palette=_spec_palette(ex_cases), errorbar=None, order=_axis_order(ex_cases))
+        ex_cases["throughput_per_min"] = ex_cases["throughput_rps"] * 60.0
+        sns.barplot(data=ex_cases, x="case_axis", y="throughput_per_min", hue="spec_display", hue_order=_spec_hue_order(ex_cases), ax=ax, palette=_spec_palette(ex_cases), errorbar=None, order=_axis_order(ex_cases))
         ax.set_title(f"{example_display}: Throughput", loc="left", pad=14)
         ax.set_xlabel("")
-        ax.set_ylabel("requests / second")
+        ax.set_ylabel("requests / min")
         ax.tick_params(axis="x", rotation=0)
         _outside_legend(ax, "Protocol")
         entry["plots"].append({"title": "Throughput", "path": _save(fig, example_dir / "throughput.png", index)})
