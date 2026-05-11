@@ -1,0 +1,324 @@
+
+
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Financial Analysis - 20260508-072202</title>
+  <link rel="stylesheet" href="../../assets/report.css">
+</head>
+<body>
+  <div class="report-shell">
+    <aside class="sidebar">
+      <h1>Financial Analysis</h1>
+      <p>Run 20260508-072202</p>
+      <p>openai/gpt-oss-120b</p>
+      <nav class="side-nav" aria-label="Example sections">
+        <a href="#summary">Summary</a>
+        <a href="#errors">Errors</a>
+        <a href="#charts">Charts</a>
+        <a href="#spec-comparison">Spec Comparison</a>
+        <a href="#cases">Cases</a>
+        <a href="#topology">Topology</a>
+      </nav>
+      <div class="nav-group">
+        <h2>Report</h2>
+        <a href="../../index.html">Full report</a>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="page-header">
+        <h1>Financial Analysis</h1>
+        <p>This page scopes the run to one example so protocol, profile, case, topology, and error differences are easier to inspect.</p>
+      </header>
+
+      <section id="summary" class="section-card">
+        <h2>Summary</h2>
+        <div class="kpi-grid">
+          <div><span>4</span><label>present cases</label></div>
+          <div><span>32</span><label>comparison cells</label></div>
+          <div><span>278</span><label>requests</label></div>
+          <div><span>276</span><label>successes</label></div>
+          <div><span>2</span><label>failures</label></div>
+          <div><span>99.3%</span><label>success rate</label></div>
+          <div><span>5,925,449</span><label>tokens</label></div>
+        </div>
+        <h3>Error Categories</h3>
+          <div class="table-wrap">
+    <table>
+      <thead><tr><th class="category">Error category</th><th class="count num">Requests</th></tr></thead>
+      <tbody>
+        <tr><td class="category">Server error / timeout</td><td class="count num">2</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+      </section>
+
+      <section id="errors" class="section-card">
+        <h2>Errors</h2>
+        <p class="muted">Request failures are benchmark-facing failed HTTP attempts. Application span errors are internal instrumented errors and may be recovered before the request completes.</p>
+        <h3>Request Failure Reasons</h3>
+          <div class="table-wrap">
+    <table>
+      <thead><tr><th class="category">Error category</th><th class="reason">Reason</th><th class="failed_requests num">Failed requests</th></tr></thead>
+      <tbody>
+        <tr><td class="category">Server error / timeout</td><td class="reason">error reading response body: unexpected EOF</td><td class="failed_requests num">2</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+        <h3>Cases With Request Failures</h3>
+          <div class="table-wrap">
+    <table>
+      <thead><tr><th class="protocol">Protocol</th><th class="profile">Profile</th><th class="failed_requests num">Failed requests</th><th class="failure_rate num">Failure rate</th><th class="category">Error category</th><th class="reason">Reason</th></tr></thead>
+      <tbody>
+        <tr><td class="protocol">HTTP</td><td class="profile">long-heavy</td><td class="failed_requests num">2</td><td class="failure_rate num">2.9%</td><td class="category">Server error / timeout</td><td class="reason">error reading response body: unexpected EOF</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+        <h3>Application Span Error Categories</h3>
+          <div class="table-wrap">
+    <table>
+      <thead><tr><th class="category">Error category</th><th class="reason">Reason</th><th class="span_errors num">Span errors</th><th class="cases num">Cases</th><th class="request_failing_cases num">Request-failing cases</th></tr></thead>
+      <tbody>
+        <tr><td class="category">Other error</td><td class="reason">error reading response body: unexpected EOF</td><td class="span_errors num">16</td><td class="cases num">1</td><td class="request_failing_cases num">1</td></tr>
+        <tr><td class="category">Other error</td><td class="reason">json: cannot unmarshal number into Go value of type string</td><td class="span_errors num">10</td><td class="cases num">1</td><td class="request_failing_cases num">1</td></tr>
+        <tr><td class="category">Other error</td><td class="reason">invalid character &#39;:&#39; after object key:value pair</td><td class="span_errors num">1</td><td class="cases num">1</td><td class="request_failing_cases num">1</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+        <h3>Application Span Error Sources</h3>
+          <div class="table-wrap">
+    <table>
+      <thead><tr><th class="service_short">Service</th><th class="operation">Operation</th><th class="category">Error category</th><th class="reason">Reason</th><th class="span_errors num">Span errors</th><th class="cases num">Cases</th><th class="request_failing_cases num">Request-failing cases</th><th class="outcome">Outcome</th></tr></thead>
+      <tbody>
+        <tr><td class="service_short">collector</td><td class="operation">llm.call</td><td class="category">Other error</td><td class="reason">error reading response body: unexpected EOF</td><td class="span_errors num">12</td><td class="cases num">1</td><td class="request_failing_cases num">1</td><td class="outcome">Request Failed</td></tr>
+        <tr><td class="service_short">collector</td><td class="operation">llm.tool_call</td><td class="category">Other error</td><td class="reason">json: cannot unmarshal number into Go value of type string</td><td class="span_errors num">5</td><td class="cases num">1</td><td class="request_failing_cases num">1</td><td class="outcome">Request Failed</td></tr>
+        <tr><td class="service_short">collector</td><td class="operation">mcp.tool_call</td><td class="category">Other error</td><td class="reason">json: cannot unmarshal number into Go value of type string</td><td class="span_errors num">5</td><td class="cases num">1</td><td class="request_failing_cases num">1</td><td class="outcome">Request Failed</td></tr>
+        <tr><td class="service_short">coordinator</td><td class="operation">llm.call</td><td class="category">Other error</td><td class="reason">error reading response body: unexpected EOF</td><td class="span_errors num">2</td><td class="cases num">1</td><td class="request_failing_cases num">1</td><td class="outcome">Request Failed</td></tr>
+        <tr><td class="service_short">writer</td><td class="operation">llm.call</td><td class="category">Other error</td><td class="reason">error reading response body: unexpected EOF</td><td class="span_errors num">2</td><td class="cases num">1</td><td class="request_failing_cases num">1</td><td class="outcome">Request Failed</td></tr>
+        <tr><td class="service_short">coordinator</td><td class="operation">llm.tool_call</td><td class="category">Other error</td><td class="reason">invalid character &#39;:&#39; after object key:value pair</td><td class="span_errors num">1</td><td class="cases num">1</td><td class="request_failing_cases num">1</td><td class="outcome">Request Failed</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+      </section>
+
+      <section id="charts" class="section-card">
+        <h2>Charts</h2>
+          <div class="gallery">
+    <figure>
+      <a href="success_rate_heatmap.png"><img src="success_rate_heatmap.png" alt="Success-rate heatmap"></a>
+      <figcaption>Success-rate heatmap</figcaption>
+    </figure>
+    <figure>
+      <a href="latency_percentiles.png"><img src="latency_percentiles.png" alt="Latency percentiles"></a>
+      <figcaption>Latency percentiles</figcaption>
+    </figure>
+    <figure>
+      <a href="throughput.png"><img src="throughput.png" alt="Throughput"></a>
+      <figcaption>Throughput</figcaption>
+    </figure>
+    <figure>
+      <a href="../../agents/financial-analyzer_agent_time.png"><img src="../../agents/financial-analyzer_agent_time.png" alt="Average agent time per request"></a>
+      <figcaption>Average agent time per request</figcaption>
+    </figure>
+    <figure>
+      <a href="../../agents/financial-analyzer_agent_tokens.png"><img src="../../agents/financial-analyzer_agent_tokens.png" alt="Average agent input/output tokens"></a>
+      <figcaption>Average agent input/output tokens</figcaption>
+    </figure>
+    <figure>
+      <a href="../../spans_per_trace/financial-analyzer_spans_per_trace_distribution.png"><img src="../../spans_per_trace/financial-analyzer_spans_per_trace_distribution.png" alt="Spans per trace distribution"></a>
+      <figcaption>Spans per trace distribution</figcaption>
+    </figure>
+    <figure>
+      <a href="../../spans_per_trace/financial-analyzer_spans_per_trace_summary.png"><img src="../../spans_per_trace/financial-analyzer_spans_per_trace_summary.png" alt="Spans per trace by protocol"></a>
+      <figcaption>Spans per trace by protocol</figcaption>
+    </figure>
+    <figure>
+      <a href="request_latency.png"><img src="request_latency.png" alt="Per-request latency"></a>
+      <figcaption>Per-request latency</figcaption>
+    </figure>
+    <figure>
+      <a href="request_latency_range.png"><img src="request_latency_range.png" alt="Request latency distribution"></a>
+      <figcaption>Request latency distribution</figcaption>
+    </figure>
+    <figure>
+      <a href="request_latency_violin.png"><img src="request_latency_violin.png" alt="Request latency violin plot"></a>
+      <figcaption>Request latency violin plot</figcaption>
+    </figure>
+    <figure>
+      <a href="request_latency_cdf.png"><img src="request_latency_cdf.png" alt="Request latency CDF"></a>
+      <figcaption>Request latency CDF</figcaption>
+    </figure>
+    <figure>
+      <a href="highest_memory_specs.png"><img src="highest_memory_specs.png" alt="Highest-memory protocol comparison"></a>
+      <figcaption>Highest-memory protocol comparison</figcaption>
+    </figure>
+  </div>
+
+      </section>
+
+      <section id="spec-comparison" class="section-card">
+        <h2>Spec Comparison</h2>
+        <p class="table-note muted">Requests are successful / total completed requests. Completed Req/min is completed request attempts per elapsed minute. E2E latency and IQR are computed over successful requests from request dispatch to final response.</p>
+          <div class="table-wrap">
+    <table>
+      <thead><tr><th class="profile">Profile</th><th class="spec">Spec</th><th class="request_summary num">Requests</th><th class="success_rate num">Success</th><th class="throughput_rps num">Completed Req/min</th><th class="p50_ms num">E2E p50</th><th class="p95_ms num">E2E p95</th><th class="iqr_ms num">E2E IQR</th></tr></thead>
+      <tbody>
+        <tr><td class="profile">long-heavy</td><td class="spec">Single</td><td class="request_summary num">66 / 66</td><td class="success_rate num">100.0%</td><td class="throughput_rps num">159.49 req/min</td><td class="p50_ms num">137.1 s</td><td class="p95_ms num">396.7 s</td><td class="iqr_ms num">47.7 s</td></tr>
+        <tr><td class="profile">long-heavy</td><td class="spec">HTTP</td><td class="request_summary num">66 / 68</td><td class="success_rate num">97.1%</td><td class="throughput_rps num">166.57 req/min</td><td class="p50_ms num">135.2 s</td><td class="p95_ms num">277.3 s</td><td class="iqr_ms num">57.0 s</td></tr>
+        <tr><td class="profile">long-heavy</td><td class="spec">MCP</td><td class="request_summary num">67 / 67</td><td class="success_rate num">100.0%</td><td class="throughput_rps num">157.75 req/min</td><td class="p50_ms num">143.9 s</td><td class="p95_ms num">336.1 s</td><td class="iqr_ms num">66.2 s</td></tr>
+        <tr><td class="profile">long-heavy</td><td class="spec">A2A</td><td class="request_summary num">77 / 77</td><td class="success_rate num">100.0%</td><td class="throughput_rps num">209.12 req/min</td><td class="p50_ms num">111.7 s</td><td class="p95_ms num">246.9 s</td><td class="iqr_ms num">64.6 s</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+        <h3>Partial or Failed Cases</h3>
+          <div class="table-wrap">
+    <table>
+      <thead><tr><th class="case_name case-name">Case</th><th class="request_summary num">Requests</th><th class="success_rate num">Success</th><th class="errors num">Errors</th><th class="p95_ms num">E2E p95</th></tr></thead>
+      <tbody>
+        <tr><td class="case_name case-name">Financial Analyzer Http Long</td><td class="request_summary num">66 / 68</td><td class="success_rate num">97.1%</td><td class="errors num">2</td><td class="p95_ms num">277.3 s</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+      </section>
+
+      <section id="cases" class="section-card">
+        <h2>Cases</h2>
+        <p class="muted">Expand a case to view request, resource, and trace thumbnails inline.</p>
+          <div class="case-detail-list">
+    <details id="case-financial-analyzer-single-long-heavy" class="case-detail">
+      <summary>
+        <span class="case-title">Financial Analyzer Single Long</span>
+        <span class="case-meta">Single &middot; long-heavy &middot; 66 / 66 requests &middot; 396.7 s p95</span>
+      </summary>
+      <div class="case-plot-grid">
+        <figure>
+          <a href="../../cases/financial-analyzer-single-long-heavy/request_latency.png"><img src="../../cases/financial-analyzer-single-long-heavy/request_latency.png" alt="Financial Analyzer Single Long Request latency"></a>
+          <figcaption>Request latency</figcaption>
+        </figure>
+        <figure>
+          <a href="../../cases/financial-analyzer-single-long-heavy/request_latency_cdf.png"><img src="../../cases/financial-analyzer-single-long-heavy/request_latency_cdf.png" alt="Financial Analyzer Single Long Latency CDF"></a>
+          <figcaption>Latency CDF</figcaption>
+        </figure>
+        <figure>
+          <a href="../../cases/financial-analyzer-single-long-heavy/resources.png"><img src="../../cases/financial-analyzer-single-long-heavy/resources.png" alt="Financial Analyzer Single Long Resource timeline"></a>
+          <figcaption>Resource timeline</figcaption>
+        </figure>
+        <figure>
+          <a href="../../cases/financial-analyzer-single-long-heavy/longest_trace_waterfall.png"><img src="../../cases/financial-analyzer-single-long-heavy/longest_trace_waterfall.png" alt="Financial Analyzer Single Long Longest trace waterfall"></a>
+          <figcaption>Longest trace waterfall</figcaption>
+        </figure>
+      </div>
+    </details>
+    <details id="case-financial-analyzer-http-long-heavy" class="case-detail">
+      <summary>
+        <span class="case-title">Financial Analyzer Http Long</span>
+        <span class="case-meta">HTTP &middot; long-heavy &middot; 66 / 68 requests &middot; 277.3 s p95</span>
+      </summary>
+      <div class="case-plot-grid">
+        <figure>
+          <a href="../../cases/financial-analyzer-http-long-heavy/request_latency.png"><img src="../../cases/financial-analyzer-http-long-heavy/request_latency.png" alt="Financial Analyzer Http Long Request latency"></a>
+          <figcaption>Request latency</figcaption>
+        </figure>
+        <figure>
+          <a href="../../cases/financial-analyzer-http-long-heavy/request_latency_cdf.png"><img src="../../cases/financial-analyzer-http-long-heavy/request_latency_cdf.png" alt="Financial Analyzer Http Long Latency CDF"></a>
+          <figcaption>Latency CDF</figcaption>
+        </figure>
+        <figure>
+          <a href="../../cases/financial-analyzer-http-long-heavy/resources.png"><img src="../../cases/financial-analyzer-http-long-heavy/resources.png" alt="Financial Analyzer Http Long Resource timeline"></a>
+          <figcaption>Resource timeline</figcaption>
+        </figure>
+        <figure>
+          <a href="../../cases/financial-analyzer-http-long-heavy/longest_trace_waterfall.png"><img src="../../cases/financial-analyzer-http-long-heavy/longest_trace_waterfall.png" alt="Financial Analyzer Http Long Longest trace waterfall"></a>
+          <figcaption>Longest trace waterfall</figcaption>
+        </figure>
+      </div>
+    </details>
+    <details id="case-financial-analyzer-mcp-long-heavy" class="case-detail">
+      <summary>
+        <span class="case-title">Financial Analyzer Mcp Long</span>
+        <span class="case-meta">MCP &middot; long-heavy &middot; 67 / 67 requests &middot; 336.1 s p95</span>
+      </summary>
+      <div class="case-plot-grid">
+        <figure>
+          <a href="../../cases/financial-analyzer-mcp-long-heavy/request_latency.png"><img src="../../cases/financial-analyzer-mcp-long-heavy/request_latency.png" alt="Financial Analyzer Mcp Long Request latency"></a>
+          <figcaption>Request latency</figcaption>
+        </figure>
+        <figure>
+          <a href="../../cases/financial-analyzer-mcp-long-heavy/request_latency_cdf.png"><img src="../../cases/financial-analyzer-mcp-long-heavy/request_latency_cdf.png" alt="Financial Analyzer Mcp Long Latency CDF"></a>
+          <figcaption>Latency CDF</figcaption>
+        </figure>
+        <figure>
+          <a href="../../cases/financial-analyzer-mcp-long-heavy/resources.png"><img src="../../cases/financial-analyzer-mcp-long-heavy/resources.png" alt="Financial Analyzer Mcp Long Resource timeline"></a>
+          <figcaption>Resource timeline</figcaption>
+        </figure>
+        <figure>
+          <a href="../../cases/financial-analyzer-mcp-long-heavy/longest_trace_waterfall.png"><img src="../../cases/financial-analyzer-mcp-long-heavy/longest_trace_waterfall.png" alt="Financial Analyzer Mcp Long Longest trace waterfall"></a>
+          <figcaption>Longest trace waterfall</figcaption>
+        </figure>
+      </div>
+    </details>
+    <details id="case-financial-analyzer-a2a-long-heavy" class="case-detail">
+      <summary>
+        <span class="case-title">Financial Analyzer A2A Long</span>
+        <span class="case-meta">A2A &middot; long-heavy &middot; 77 / 77 requests &middot; 246.9 s p95</span>
+      </summary>
+      <div class="case-plot-grid">
+        <figure>
+          <a href="../../cases/financial-analyzer-a2a-long-heavy/request_latency.png"><img src="../../cases/financial-analyzer-a2a-long-heavy/request_latency.png" alt="Financial Analyzer A2A Long Request latency"></a>
+          <figcaption>Request latency</figcaption>
+        </figure>
+        <figure>
+          <a href="../../cases/financial-analyzer-a2a-long-heavy/request_latency_cdf.png"><img src="../../cases/financial-analyzer-a2a-long-heavy/request_latency_cdf.png" alt="Financial Analyzer A2A Long Latency CDF"></a>
+          <figcaption>Latency CDF</figcaption>
+        </figure>
+        <figure>
+          <a href="../../cases/financial-analyzer-a2a-long-heavy/resources.png"><img src="../../cases/financial-analyzer-a2a-long-heavy/resources.png" alt="Financial Analyzer A2A Long Resource timeline"></a>
+          <figcaption>Resource timeline</figcaption>
+        </figure>
+        <figure>
+          <a href="../../cases/financial-analyzer-a2a-long-heavy/longest_trace_waterfall.png"><img src="../../cases/financial-analyzer-a2a-long-heavy/longest_trace_waterfall.png" alt="Financial Analyzer A2A Long Longest trace waterfall"></a>
+          <figcaption>Longest trace waterfall</figcaption>
+        </figure>
+      </div>
+    </details>
+  </div>
+
+      </section>
+
+      <section id="topology" class="section-card">
+        <h2>Topology</h2>
+          <div class="gallery">
+    <figure>
+      <a href="../../topology/financial-analyzer_single.svg"><img src="../../topology/financial-analyzer_single.svg" alt="Financial Analysis single topology"></a>
+      <figcaption>Financial Analysis single topology</figcaption>
+    </figure>
+    <figure>
+      <a href="../../topology/financial-analyzer_http.svg"><img src="../../topology/financial-analyzer_http.svg" alt="Financial Analysis http topology"></a>
+      <figcaption>Financial Analysis http topology</figcaption>
+    </figure>
+    <figure>
+      <a href="../../topology/financial-analyzer_mcp.svg"><img src="../../topology/financial-analyzer_mcp.svg" alt="Financial Analysis mcp topology"></a>
+      <figcaption>Financial Analysis mcp topology</figcaption>
+    </figure>
+    <figure>
+      <a href="../../topology/financial-analyzer_a2a.svg"><img src="../../topology/financial-analyzer_a2a.svg" alt="Financial Analysis a2a topology"></a>
+      <figcaption>Financial Analysis a2a topology</figcaption>
+    </figure>
+  </div>
+
+      </section>
+    </main>
+  </div>
+</body>
+</html>

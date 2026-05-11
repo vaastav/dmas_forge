@@ -1,0 +1,17 @@
+case_name,example,spec,profile,case_total_tokens,accounted_tokens,unattributed_tokens,token_delta,attribution_ok
+financial-analyzer-single-long-heavy,financial-analyzer,single,long-heavy,1357355.0,1357355.0,0.0,0.0,True
+financial-analyzer-http-long-heavy,financial-analyzer,http,long-heavy,1498628.0,1498628.0,0.0,0.0,True
+financial-analyzer-mcp-long-heavy,financial-analyzer,mcp,long-heavy,1405490.0,1405490.0,0.0,0.0,True
+financial-analyzer-a2a-long-heavy,financial-analyzer,a2a,long-heavy,1663976.0,1663976.0,0.0,0.0,True
+marketing-agency-single-long-heavy,marketing-agency,single,long-heavy,2215947.0,2215947.0,0.0,0.0,True
+marketing-agency-http-long-heavy,marketing-agency,http,long-heavy,1861559.0,1861559.0,0.0,0.0,True
+marketing-agency-mcp-long-heavy,marketing-agency,mcp,long-heavy,2131819.0,2131819.0,0.0,0.0,True
+marketing-agency-a2a-long-heavy,marketing-agency,a2a,long-heavy,2356375.0,2356375.0,0.0,0.0,True
+travel-planning-single-long-heavy,travel-planning,single,long-heavy,1623065.0,1623065.0,0.0,0.0,True
+travel-planning-http-long-heavy,travel-planning,http,long-heavy,1427829.0,1427829.0,0.0,0.0,True
+travel-planning-mcp-long-heavy,travel-planning,mcp,long-heavy,1522720.0,1522720.0,0.0,0.0,True
+travel-planning-a2a-long-heavy,travel-planning,a2a,long-heavy,1187753.0,1187753.0,0.0,0.0,True
+weather-single-long-heavy,weather,single,long-heavy,769303.0,769303.0,1635.0,0.0,False
+weather-http-long-heavy,weather,http,long-heavy,964848.0,964848.0,1888.0,0.0,False
+weather-mcp-long-heavy,weather,mcp,long-heavy,885519.0,885519.0,0.0,0.0,True
+weather-a2a-long-heavy,weather,a2a,long-heavy,907168.0,907168.0,2070.0,0.0,False

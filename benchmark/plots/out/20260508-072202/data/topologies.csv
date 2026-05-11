@@ -1,0 +1,149 @@
+example,spec,kind,source,target,label,role,protocol,container,llm
+financial-analyzer,single,service,coordinator,,FinancialAnalyzerCoordinator,front,,single app container,coordinator_core
+financial-analyzer,single,service,research,,ResearchQualityController,orchestrator,,single app container,researcher_core
+financial-analyzer,single,service,collector,,DataCollectorAgent,worker,,single app container,collector_core
+financial-analyzer,single,service,evaluator,,DataEvaluatorAgent,worker,,single app container,evaluator_core
+financial-analyzer,single,service,analyst,,FinancialAnalystAgent,worker,,single app container,analyst_core
+financial-analyzer,single,service,writer,,ReportWriterAgent,worker,,single app container,writer_core
+financial-analyzer,single,edge,coordinator,research,research,,in-process,,
+financial-analyzer,single,edge,coordinator,analyst,analysis,,in-process,,
+financial-analyzer,single,edge,coordinator,writer,report,,in-process,,
+financial-analyzer,single,edge,research,collector,collect,,in-process,,
+financial-analyzer,single,edge,research,evaluator,evaluate,,in-process,,
+financial-analyzer,single,tool,collector,search_web,mock finance search,mock_tool,tool,external/mock,
+financial-analyzer,single,tool,collector,fetch_url,mock finance fetch,mock_tool,tool,external/mock,
+financial-analyzer,http,service,coordinator,,FinancialAnalyzerCoordinator,front,,coordinator container,coordinator_core
+financial-analyzer,http,service,research,,ResearchQualityController,orchestrator,,research container,researcher_core
+financial-analyzer,http,service,collector,,DataCollectorAgent,worker,,collector container,collector_core
+financial-analyzer,http,service,evaluator,,DataEvaluatorAgent,worker,,evaluator container,evaluator_core
+financial-analyzer,http,service,analyst,,FinancialAnalystAgent,worker,,analyst container,analyst_core
+financial-analyzer,http,service,writer,,ReportWriterAgent,worker,,writer container,writer_core
+financial-analyzer,http,edge,coordinator,research,research,,HTTP,,
+financial-analyzer,http,edge,coordinator,analyst,analysis,,HTTP,,
+financial-analyzer,http,edge,coordinator,writer,report,,HTTP,,
+financial-analyzer,http,edge,research,collector,collect,,HTTP,,
+financial-analyzer,http,edge,research,evaluator,evaluate,,HTTP,,
+financial-analyzer,http,tool,collector,search_web,mock finance search,mock_tool,tool,external/mock,
+financial-analyzer,http,tool,collector,fetch_url,mock finance fetch,mock_tool,tool,external/mock,
+financial-analyzer,mcp,service,coordinator,,FinancialAnalyzerCoordinator,front,,coordinator container,coordinator_core
+financial-analyzer,mcp,service,research,,ResearchQualityController,orchestrator,,research container,researcher_core
+financial-analyzer,mcp,service,collector,,DataCollectorAgent,worker,,collector container,collector_core
+financial-analyzer,mcp,service,evaluator,,DataEvaluatorAgent,worker,,evaluator container,evaluator_core
+financial-analyzer,mcp,service,analyst,,FinancialAnalystAgent,worker,,analyst container,analyst_core
+financial-analyzer,mcp,service,writer,,ReportWriterAgent,worker,,writer container,writer_core
+financial-analyzer,mcp,edge,coordinator,research,research,,MCP,,
+financial-analyzer,mcp,edge,coordinator,analyst,analysis,,MCP,,
+financial-analyzer,mcp,edge,coordinator,writer,report,,MCP,,
+financial-analyzer,mcp,edge,research,collector,collect,,MCP,,
+financial-analyzer,mcp,edge,research,evaluator,evaluate,,MCP,,
+financial-analyzer,mcp,tool,collector,search_web,mock finance search,mock_tool,tool,external/mock,
+financial-analyzer,mcp,tool,collector,fetch_url,mock finance fetch,mock_tool,tool,external/mock,
+financial-analyzer,a2a,service,coordinator,,FinancialAnalyzerCoordinator,front,,coordinator container,coordinator_core
+financial-analyzer,a2a,service,research,,ResearchQualityController,orchestrator,,research container,researcher_core
+financial-analyzer,a2a,service,collector,,DataCollectorAgent,worker,,collector container,collector_core
+financial-analyzer,a2a,service,evaluator,,DataEvaluatorAgent,worker,,evaluator container,evaluator_core
+financial-analyzer,a2a,service,analyst,,FinancialAnalystAgent,worker,,analyst container,analyst_core
+financial-analyzer,a2a,service,writer,,ReportWriterAgent,worker,,writer container,writer_core
+financial-analyzer,a2a,edge,coordinator,research,research,,A2A,,
+financial-analyzer,a2a,edge,coordinator,analyst,analysis,,A2A,,
+financial-analyzer,a2a,edge,coordinator,writer,report,,A2A,,
+financial-analyzer,a2a,edge,research,collector,collect,,A2A,,
+financial-analyzer,a2a,edge,research,evaluator,evaluate,,A2A,,
+financial-analyzer,a2a,tool,collector,search_web,mock finance search,mock_tool,tool,external/mock,
+financial-analyzer,a2a,tool,collector,fetch_url,mock finance fetch,mock_tool,tool,external/mock,
+marketing-agency,single,service,coordinator,,MarketingCoordinator,front,,single app container,coordinator_core
+marketing-agency,single,service,domain,,DomainAgent,worker,,single app container,domain_agent_core
+marketing-agency,single,service,website,,WebsiteAgent,worker,,single app container,website_agent_core
+marketing-agency,single,service,marketing,,MarketingAgent,worker,,single app container,marketing_agent_core
+marketing-agency,single,service,logo,,LogoAgent,worker,,single app container,logo_agent_core
+marketing-agency,single,edge,coordinator,domain,domain,,in-process,,
+marketing-agency,single,edge,coordinator,website,website,,in-process,,
+marketing-agency,single,edge,coordinator,marketing,marketing,,in-process,,
+marketing-agency,single,edge,coordinator,logo,logo,,in-process,,
+marketing-agency,single,tool,domain,duckduckgo_search,mock search,mock_tool,tool,external/mock,
+marketing-agency,single,tool,logo,image_generation,mock image,mock_tool,tool,external/mock,
+marketing-agency,http,service,coordinator,,MarketingCoordinator,front,,coordinator container,coordinator_core
+marketing-agency,http,service,domain,,DomainAgent,worker,,domain container,domain_agent_core
+marketing-agency,http,service,website,,WebsiteAgent,worker,,website container,website_agent_core
+marketing-agency,http,service,marketing,,MarketingAgent,worker,,marketing container,marketing_agent_core
+marketing-agency,http,service,logo,,LogoAgent,worker,,logo container,logo_agent_core
+marketing-agency,http,edge,coordinator,domain,domain,,HTTP,,
+marketing-agency,http,edge,coordinator,website,website,,HTTP,,
+marketing-agency,http,edge,coordinator,marketing,marketing,,HTTP,,
+marketing-agency,http,edge,coordinator,logo,logo,,HTTP,,
+marketing-agency,http,tool,domain,duckduckgo_search,mock search,mock_tool,tool,external/mock,
+marketing-agency,http,tool,logo,image_generation,mock image,mock_tool,tool,external/mock,
+marketing-agency,mcp,service,coordinator,,MarketingCoordinator,front,,coordinator container,coordinator_core
+marketing-agency,mcp,service,domain,,DomainAgent,worker,,domain container,domain_agent_core
+marketing-agency,mcp,service,website,,WebsiteAgent,worker,,website container,website_agent_core
+marketing-agency,mcp,service,marketing,,MarketingAgent,worker,,marketing container,marketing_agent_core
+marketing-agency,mcp,service,logo,,LogoAgent,worker,,logo container,logo_agent_core
+marketing-agency,mcp,edge,coordinator,domain,domain,,MCP,,
+marketing-agency,mcp,edge,coordinator,website,website,,MCP,,
+marketing-agency,mcp,edge,coordinator,marketing,marketing,,MCP,,
+marketing-agency,mcp,edge,coordinator,logo,logo,,MCP,,
+marketing-agency,mcp,tool,domain,duckduckgo_search,mock search,mock_tool,tool,external/mock,
+marketing-agency,mcp,tool,logo,image_generation,mock image,mock_tool,tool,external/mock,
+marketing-agency,a2a,service,coordinator,,MarketingCoordinator,front,,coordinator container,coordinator_core
+marketing-agency,a2a,service,domain,,DomainAgent,worker,,domain container,domain_agent_core
+marketing-agency,a2a,service,website,,WebsiteAgent,worker,,website container,website_agent_core
+marketing-agency,a2a,service,marketing,,MarketingAgent,worker,,marketing container,marketing_agent_core
+marketing-agency,a2a,service,logo,,LogoAgent,worker,,logo container,logo_agent_core
+marketing-agency,a2a,edge,coordinator,domain,domain,,A2A,,
+marketing-agency,a2a,edge,coordinator,website,website,,A2A,,
+marketing-agency,a2a,edge,coordinator,marketing,marketing,,A2A,,
+marketing-agency,a2a,edge,coordinator,logo,logo,,A2A,,
+marketing-agency,a2a,tool,domain,duckduckgo_search,mock search,mock_tool,tool,external/mock,
+marketing-agency,a2a,tool,logo,image_generation,mock image,mock_tool,tool,external/mock,
+travel-planning,single,service,coordinator,,TravelCoordinator,front,,single app container,coordinator_llm
+travel-planning,single,service,planner,,TravelPlannerAgent,worker,,single app container,planner_llm
+travel-planning,single,service,local,,LocalAgent,worker,,single app container,local_llm
+travel-planning,single,service,language,,LanguageAgent,worker,,single app container,language_llm
+travel-planning,single,service,summary,,TravelSummaryAgent,worker,,single app container,summary_llm
+travel-planning,single,edge,coordinator,planner,plan,,in-process,,
+travel-planning,single,edge,coordinator,local,local,,in-process,,
+travel-planning,single,edge,coordinator,language,language,,in-process,,
+travel-planning,single,edge,coordinator,summary,summary,,in-process,,
+travel-planning,http,service,coordinator,,TravelCoordinator,front,,coordinator container,coordinator_llm
+travel-planning,http,service,planner,,TravelPlannerAgent,worker,,planner container,planner_llm
+travel-planning,http,service,local,,LocalAgent,worker,,local container,local_llm
+travel-planning,http,service,language,,LanguageAgent,worker,,language container,language_llm
+travel-planning,http,service,summary,,TravelSummaryAgent,worker,,summary container,summary_llm
+travel-planning,http,edge,coordinator,planner,plan,,HTTP,,
+travel-planning,http,edge,coordinator,local,local,,HTTP,,
+travel-planning,http,edge,coordinator,language,language,,HTTP,,
+travel-planning,http,edge,coordinator,summary,summary,,HTTP,,
+travel-planning,mcp,service,coordinator,,TravelCoordinator,front,,coordinator container,coordinator_llm
+travel-planning,mcp,service,planner,,TravelPlannerAgent,worker,,planner container,planner_llm
+travel-planning,mcp,service,local,,LocalAgent,worker,,local container,local_llm
+travel-planning,mcp,service,language,,LanguageAgent,worker,,language container,language_llm
+travel-planning,mcp,service,summary,,TravelSummaryAgent,worker,,summary container,summary_llm
+travel-planning,mcp,edge,coordinator,planner,plan,,MCP,,
+travel-planning,mcp,edge,coordinator,local,local,,MCP,,
+travel-planning,mcp,edge,coordinator,language,language,,MCP,,
+travel-planning,mcp,edge,coordinator,summary,summary,,MCP,,
+travel-planning,a2a,service,coordinator,,TravelCoordinator,front,,coordinator container,coordinator_llm
+travel-planning,a2a,service,planner,,TravelPlannerAgent,worker,,planner container,planner_llm
+travel-planning,a2a,service,local,,LocalAgent,worker,,local container,local_llm
+travel-planning,a2a,service,language,,LanguageAgent,worker,,language container,language_llm
+travel-planning,a2a,service,summary,,TravelSummaryAgent,worker,,summary container,summary_llm
+travel-planning,a2a,edge,coordinator,planner,plan,,A2A,,
+travel-planning,a2a,edge,coordinator,local,local,,A2A,,
+travel-planning,a2a,edge,coordinator,language,language,,A2A,,
+travel-planning,a2a,edge,coordinator,summary,summary,,A2A,,
+weather,single,service,weather,,WeatherAgent,front,,single app container,wagent
+weather,single,service,disaster,,DisasterAgent,worker,,single app container,dagent
+weather,single,edge,weather,disaster,query,,in-process,,
+weather,single,tool,weather,get_weather,mock weather tool,mock_tool,tool,external/mock,
+weather,http,service,weather,,WeatherAgent,front,,weather container,wagent
+weather,http,service,disaster,,DisasterAgent,worker,,disaster container,dagent
+weather,http,edge,weather,disaster,query,,HTTP,,
+weather,http,tool,weather,get_weather,mock weather tool,mock_tool,tool,external/mock,
+weather,mcp,service,weather,,WeatherAgent,front,,weather container,wagent
+weather,mcp,service,disaster,,DisasterAgent,worker,,disaster container,dagent
+weather,mcp,edge,weather,disaster,query,,MCP,,
+weather,mcp,tool,weather,get_weather,mock weather tool,mock_tool,tool,external/mock,
+weather,a2a,service,weather,,WeatherAgent,front,,weather container,wagent
+weather,a2a,service,disaster,,DisasterAgent,worker,,disaster container,dagent
+weather,a2a,edge,weather,disaster,query,,A2A,,
+weather,a2a,tool,weather,get_weather,mock weather tool,mock_tool,tool,external/mock,
