@@ -4,25 +4,20 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
-	"github.com/vaastav/dmas_forge/ai_runtime/core"
 )
 
 type ResearchQualityControllerImpl struct {
-	agent     core.Agent
 	collector DataCollectorAgent
 	evaluator DataEvaluatorAgent
 }
 
 func NewResearchQualityControllerImpl(
 	ctx context.Context,
-	agent core.Agent,
 	collector DataCollectorAgent,
 	evaluator DataEvaluatorAgent,
 ) (ResearchQualityController, error) {
 	_ = ctx
 	return &ResearchQualityControllerImpl{
-		agent:     agent,
 		collector: collector,
 		evaluator: evaluator,
 	}, nil
